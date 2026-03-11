@@ -141,10 +141,183 @@ def processar_item_lista(doc_template, item, marcador):
             pdf.close(); return imgs
         return [InlineImage(doc_template, item, width=Mm(largura))]
     except: return []
+# --- FUNÇÕES DE PERSISTÊNCIA DE RELATÓRIO ---
+def _normalizar_nome_relatorio(nome: str) -> str:
+    """Transforma o nome em algo seguro para usar como pasta."""
+    nome = nome.strip()
+    for ch in r'\/:*?"<>|':
+        nome = nome.replace(ch, "_")
+    return nome or "relatorio_sem_nome"
+
+
+def listar_relatorios_salvos():
+    if not BASE_RELATORIOS_DIR.exists():
+        return []
+    return sorted([p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()])
+
+
+def _caminho_relatorio(nome_normalizado: str) -> Path:
+    return BASE_RELATORIOS_DIR / nome_normalizado
+
+
+def salvar_relatorio(nome_relatorio: str):
+    if not nome_relatorio:
+        st.warning("Informe um nome para o relatório antes de salvar.")
+        return
+
+    nome_norm = _normalizar_nome_relatorio(nome_relatorio)
+    pasta_rel = _caminho_relatorio(nome_norm)
+    pasta_rel.mkdir(parents=True, exist_ok=True)
+
+    # 1) Salvar estado dos campos
+    form_state = {k: st.session_state.get(k) for k in FORM_KEYS}
+
+    # 2) Salvar evidências em arquivos físicos
+    pasta_evid = pasta_rel / "evidencias"
+    pasta_evid.mkdir(exist_ok=True)
+
+    evidencias_meta = {}
+    for marcador, itens in st.session_state.dados_sessao.items():
+        evidencias_meta[marcador] = []
+        for idx, item in enumerate(itens):
+            nome_arquivo_original = item["name"]
+            tipo = item["type"]
+
+            # Descobrir extensão base a partir do nome original
+            _, ext = os.path.splitext(nome_arquivo_original)
+            ext = ext.lower()
+
+            conteudo = item["content"]
+
+            # NOVO: tratar especificamente imagens PIL (ex.: PngImageFile do paste_image_button)
+            if isinstance(conteudo, Image.Image):
+                buf = io.BytesIO()
+                conteudo.save(buf, format="PNG")
+                data = buf.getvalue()
+                if not ext:
+                    ext = ".png"
+            else:
+                # Conteúdo pode ser UploadedFile, BytesIO, bytes, etc.
+                if hasattr(conteudo, "getvalue"):
+                    data = conteudo.getvalue()
+                elif hasattr(conteudo, "read"):
+                    try:
+                        conteudo.seek(0)
+                    except Exception:
+                        pass
+                    data = conteudo.read()
+                else:
+                    # assume bytes
+                    data = conteudo
+
+                if not ext:
+                    ext = ".bin"
+
+            nome_arquivo_dest = f"{marcador}_{idx}{ext}"
+            caminho_arquivo_dest = pasta_evid / nome_arquivo_dest
+
+            with open(caminho_arquivo_dest, "wb") as f:
+                f.write(data)
+
+            evidencias_meta[marcador].append({
+                "name": nome_arquivo_original,
+                "file": f"evidencias/{nome_arquivo_dest}",
+                "type": tipo
+            })
+
+    # 3) Gravar JSON com o estado completo
+    estado = {
+        "form_state": form_state,
+        "evidencias": evidencias_meta
+    }
+
+    with open(pasta_rel / "estado.json", "w", encoding="utf-8") as f:
+        json.dump(estado, f, ensure_ascii=False, indent=2)
+
+    st.session_state.relatorio_atual = nome_norm
+    st.success(f"Relatório '{nome_relatorio}' salvo com sucesso.")
+
+
+def carregar_relatorio(nome_relatorio: str):
+    nome_norm = _normalizar_nome_relatorio(nome_relatorio)
+    pasta_rel = _caminho_relatorio(nome_norm)
+    estado_path = pasta_rel / "estado.json"
+
+    if not estado_path.exists():
+        st.error("Não foi encontrado estado salvo para este relatório.")
+        return
+
+    with open(estado_path, "r", encoding="utf-8") as f:
+        estado = json.load(f)
+
+    form_state = estado.get("form_state", {})
+    evidencias_meta = estado.get("evidencias", {})
+
+    # 1) Aplicar form_state ao session_state
+    for k, v in form_state.items():
+        st.session_state[k] = v
+
+    # 2) Reconstruir dados_sessao
+    st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
+
+    for marcador, lista_itens in evidencias_meta.items():
+        if marcador not in st.session_state.dados_sessao:
+            st.session_state.dados_sessao[marcador] = []
+        for meta in lista_itens:
+            caminho_arquivo = pasta_rel / meta["file"]
+            if not caminho_arquivo.exists():
+                continue
+            with open(caminho_arquivo, "rb") as f:
+                data = f.read()
+            bio = io.BytesIO(data)
+            bio.name = meta["name"]
+            st.session_state.dados_sessao[marcador].append({
+                "name": meta["name"],
+                "content": bio,
+                "type": meta.get("type", "f")
+            })
+
+    st.session_state.relatorio_atual = nome_norm
+    st.success(f"Relatório '{nome_relatorio}' carregado.")
 
 # --- UI PRINCIPAL ---
 st.title("Automação de Relatórios - Cachoeira")
 st.caption("Versão 0.9.3")
+
+# --- GERENCIAMENTO DE RELATÓRIOS SALVOS ---
+with st.container(border=True):
+    st.markdown("#### Gerenciamento de Relatórios")
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+
+    with col1:
+        relatorios_existentes = listar_relatorios_salvos()
+        opcao_rel = st.selectbox(
+            "Relatórios salvos",
+            ["(Novo relatório)"] + relatorios_existentes,
+            index=0
+        )
+
+    with col2:
+        nome_input = st.text_input(
+            "Nome do relatório",
+            value=st.session_state.relatorio_atual or ""
+        )
+
+    with col3:
+        if st.button("Carregar", key="btn_carregar_relatorio"):
+            if opcao_rel != "(Novo relatório)":
+                carregar_relatorio(opcao_rel)
+                st.rerun()
+            else:
+                st.warning("Selecione um relatório salvo para carregar.")
+
+        if st.button("Salvar", key="btn_salvar_relatorio"):
+            nome_para_salvar = nome_input or opcao_rel
+            if not nome_para_salvar or nome_para_salvar == "(Novo relatório)":
+                st.warning("Digite um nome para o relatório antes de salvar.")
+            else:
+                salvar_relatorio(nome_para_salvar)
 
 t_hosp, t_amb, t_cir, t_upa, t_evidencia = st.tabs(
     ["HOSPITAL", "AMBULATÓRIO/PARECER", "CIRURGIAS/EXAMES", "UPA", "ARQUIVOS"]
@@ -294,13 +467,14 @@ with t_evidencia:
             # CORREÇÃO DO LOOP INFINITO: Chave dinâmica baseada no número de itens
             kp = f"p_{marcador}_{len(st.session_state.dados_sessao.get(marcador, []))}"
             pasted = paste_image_button(label="📸 Colar Print", key=kp)
-            
             if pasted is not None and pasted.image_data is not None:
-                st.session_state.dados_sessao[marcador].append({
-                    "name": f"Captura_{marcador}_{int(time.time())}.png", 
-                    "content": pasted.image_data, 
-                    "type": "p"
-                })
+                st.session_state.dados_sessao[marcador].append(
+                    {
+                        "name": f"Captura_{marcador}_{int(time.time())}.png", 
+                        "content": pasted.image_data, 
+                        "type": "p"
+                    }
+                )
                 # Feedback de sucesso
                 st.toast(f"Anexado: {marcador}")
                 time.sleep(0.4)
@@ -314,7 +488,7 @@ with t_evidencia:
                         st.session_state.dados_sessao[marcador].pop(idx); st.rerun()
 
 # --- GERAÇÃO FINAL ---
-if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_finalizar"):
+if st.button("FINALIZAR E GERAR RELATÓRIO", type="primary", key="btn_finalizar"):
     try:
         with st.spinner("Processando indicadores e gerando documento..."):
             with tempfile.TemporaryDirectory() as tmp:
@@ -377,17 +551,18 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
                 cd1, cd2 = st.columns(2)
                 with cd1:
                     with open(docx_p, "rb") as f_w:
-                        st.download_button("WORD (.docx)", f_w.read(), f"RELATORIO_CACHOEIRA_{st.session_state.sel_mes}.docx")
+                        st.download_button("WORD (.docx)", f_w.read(), f"RELATÓRIO ASSISTENCIAL MENSAL - SANTA MARIA MADALENA {st.session_state.sel_mes}.docx")
                 with cd2:
                     try:
                         converter_para_pdf(docx_p, tmp)
                         pdf_p = os.path.join(tmp, "relatorio.pdf")
                         if os.path.exists(pdf_p):
                             with open(pdf_p, "rb") as f_p:
-                                st.download_button("PDF", f_p.read(), f"RELATORIO_CACHOEIRA_{st.session_state.sel_mes}.pdf")
+                                st.download_button("PDF", f_p.read(), f"RELATÓRIO ASSISTENCIAL MENSAL - SANTA MARIA MADALENA {st.session_state.sel_mes}.pdf")
                     except: st.warning("Conversão PDF não disponível no ambiente atual.")
 
     except Exception as e:
         st.error(f"Erro Crítico: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
+
