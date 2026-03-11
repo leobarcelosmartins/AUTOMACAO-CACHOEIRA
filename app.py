@@ -85,6 +85,44 @@ DIMENSOES_CAMPOS = {
     "TABELA_QUANTI": 200, "TABELA_QUALI": 200
 }
 
+# --- DICIONÁRIO DE DESCRIÇÕES AMIGÁVEIS (LABELS) ---
+LABELS_EVIDENCIAS = {
+    "PRINT_ATEND_OCUPACAO": "Tabela de Atendimento por Ocupação",
+    "PRINT_CLASSIFICAÇÃO": "Tabela de Classificação de Risco",
+    "GRAFICO_CIRURGIAS_ELETIVAS": "Gráfico das Cirurgias Eletivas",
+    "TABELA_CIRURGIAS": "Tabela de Cirurgias por Profissional",
+    "TABELA_RAIOX": "Tabela de Raio X",
+    "TABELA_CONS_TRANSFERENCIA": "Tabela Consolidada de Transferências",
+    "TABELA_DET_TRANSFERENCIA": "Tabela Detalhada de Transferências",
+    "TABELA_OBITO": "Tabela de Óbitos",
+    "ATA_OBITO": "Ata de Revisão de Óbito",
+    "TABELA_CCIH": "Tabela CCIH",
+    "ATA_COMISSAO_CCIH": "Ata Comissão CCIH",
+    "ATA_COMISSAO_REVISAO_PRONT": "Ata Comissão Revisão de Prontuário",
+    "APERFEICOAMENTO_PROFISSIONAL": "Aperfeiçoamento Profissional (Arquivos)",
+    "H_TABELA_PESQUISA_INTERNA": "Tabela da Pesquisa Interna do SAU",
+    "H_GRAFICO_PESQUISA_INTERNA": "Gráfico da Pesquisa Interna do SAU",
+    "H_TABELA_PESQUISA_RECEPTIVA": "Tabela da Pesquisa Receptiva do SAU",
+    "H_GRAFICO_PESQUISA_RECEPTIVA": "Gráfico da Pesquisa Receptiva do SAU",
+    "H_GRAFICO_PESQUISA_RECEPTIVA_2": "Tabela 2 da Pesquisa Receptiva do SAU",
+    "UPA_TABELA_ATENDIMENTOS": "Tabela de Atendimentos por Ocupação UPA",
+    "UPA_TABELA_CLASSIFICAÇÃO": "Tabela de Classificação de Risco UPA",
+    "UPA_RELATORIO_MENSAL_RX": "Relatório Mensal Raio X UPA",
+    "UPA_TABELA_TRANSFERENCIA": "Tabela de Transferência UPA",
+    "UPA_TABELA_OBITO": "Tabela de Óbitos UPA",
+    "UPA_ATA_OBITO": "Ata de Revisão de Óbito UPA",
+    "UPA_ATA_PRONTUARIO": "Ata de Revisão de Prontuário UPA",
+    "UPA_ATA_CCIH": "Ata de Revisão da Comissão do CCIH UPA",
+    "UPA_APERF_PROF": "UPA Aperfeiçoamento Profissional",
+    "UPA_TABELA_PESQUISA_INTERNA": "Tabela da Pesquisa Interna UPA",
+    "UPA_GRAFICO_PESQUISA_INTERNA": "Gráfico da Pesquisa Interna UPA",
+    "UPA_TABELA_PESQUISA_RECEPTIVA": "Tabela da Pesquisa Receptiva UPA",
+    "UPA_GRAFICO_PESQUISA_RECEPTIVA": "Gráfico da Pesquisa Receptiva UPA",
+    "UPA_GRAFICO_PESQUISA_RECEPTIVA_2": "Tabela 2 da Pesquisa Receptiva UPA",
+    "TABELA_QUANTI": "Tabela Quanti (Geral)",
+    "TABELA_QUALI": "Tabela Quali (Geral)"
+}
+
 # --- CHAVES DE CAMPOS ---
 FORM_KEYS = [
     "sel_mes", "sel_ano", "H_T_PAC_INT", "H_ALTA", "H_TRANSF_MAIOR", "H_TRANSF_MENOR",
@@ -252,26 +290,23 @@ def processar_item_lista(doc_template, item, marcador):
 
 # --- UI PRINCIPAL ---
 st.title("Automação de Relatórios - Cachoeira")
-# ----------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------
+
 # --- GESTOR DE RELATÓRIOS (ESTILO DA IMAGEM) ---
-# with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session_state.relatorio_atual):
-#     col_g1, col_g2 = st.columns([2, 1])
-#    with col_g1:
-#         lista_pastas = [p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()]
-#         sel_disco = st.selectbox("Relatórios Guardados", ["-- Selecionar --"] + lista_pastas)
-#         ca1, ca2 = st.columns(2)
-#         if ca1.button("📥 Carregar Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
-#             carregar_relatorio(sel_disco)
-#             st.rerun()
-#         if ca2.button("🗑️ Excluir Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
-#             excluir_relatorio(sel_disco)
-#     with col_g2:
-#         novo_nome = st.text_input("Nome do Relatório", placeholder="Ex: Pacheco_Marco_2025", value=st.session_state.relatorio_atual)
-#         if st.button("💾 Salvar Progresso", use_container_width=True, type="primary"):
-#             salvar_relatorio(novo_nome)
-# ----------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------
+with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session_state.relatorio_atual):
+    col_g1, col_g2 = st.columns([2, 1])
+    with col_g1:
+        lista_pastas = [p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()]
+        sel_disco = st.selectbox("Relatórios Guardados", ["-- Selecionar --"] + lista_pastas)
+        ca1, ca2 = st.columns(2)
+        if ca1.button("📥 Carregar Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
+            carregar_relatorio(sel_disco)
+            st.rerun()
+        if ca2.button("🗑️ Excluir Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
+            excluir_relatorio(sel_disco)
+    with col_g2:
+        novo_nome = st.text_input("Nome do Relatório", placeholder="Ex: Pacheco_Marco_2025", value=st.session_state.relatorio_atual)
+        if st.button("💾 Salvar Progresso", use_container_width=True, type="primary"):
+            salvar_relatorio(novo_nome)
 
 # --- BACKUP EXTERNO (ZIP) - MESMO ESTILO ---
 with st.expander("☁️ Backup Externo (Importar / Exportar ZIP)", expanded=False):
@@ -415,22 +450,44 @@ with t_upa:
 
 # --- ABA ARQUIVOS (EVIDÊNCIAS) ---
 with t_evidencia:
-    for marcador in DIMENSOES_CAMPOS.keys():
-        with st.container(border=True):
-            st.markdown(f"<span class='upload-label'>{marcador} (Largura: {DIMENSOES_CAMPOS[marcador]}mm)</span>", unsafe_allow_html=True)
-            f_up = st.file_uploader("Upload", type=['png', 'jpg', 'pdf'], key=f"f_{marcador}", label_visibility="collapsed")
-            if f_up and f_up.name not in [x['name'] for x in st.session_state.dados_sessao.get(marcador, [])]:
-                st.session_state.dados_sessao[marcador].append({"name": f_up.name, "content": f_up, "type": "f"})
-            kp = f"p_{marcador}_{len(st.session_state.dados_sessao.get(marcador, []))}"
-            pasted = paste_image_button(label="📸 Colar Print", key=kp)
-            if pasted is not None and pasted.image_data is not None:
-                st.session_state.dados_sessao[marcador].append({"name": f"Captura_{marcador}_{int(time.time())}.png", "content": pasted.image_data, "type": "p"})
-                st.toast(f"Anexado: {marcador}"); time.sleep(0.4); st.rerun()
-            if st.session_state.dados_sessao.get(marcador):
-                for idx, item in enumerate(st.session_state.dados_sessao[marcador]):
-                    col1, col2 = st.columns([0.9, 0.1])
-                    col1.caption(f"📄 {item['name']}")
-                    if col2.button("🗑️", key=f"del_{marcador}_{idx}"): st.session_state.dados_sessao[marcador].pop(idx); st.rerun()
+    # Agrupamento para facilitar a navegação (Opcional, mas recomendado)
+    secoes_evidencias = [
+        {"nome": "Hospital - Atendimentos e Classificação", "marcadores": ["PRINT_ATEND_OCUPACAO", "PRINT_CLASSIFICAÇÃO"]},
+        {"nome": "Hospital - Cirurgias e Procedimentos", "marcadores": ["GRAFICO_CIRURGIAS_ELETIVAS", "TABELA_CIRURGIAS", "TABELA_RAIOX", "H_T_PROC_CIR"]},
+        {"nome": "Hospital - Transferências e Óbitos", "marcadores": ["TABELA_CONS_TRANSFERENCIA", "TABELA_DET_TRANSFERENCIA", "TABELA_OBITO", "ATA_OBITO"]},
+        {"nome": "Hospital - Comissões e Qualidade", "marcadores": ["TABELA_CCIH", "ATA_COMISSAO_CCIH", "ATA_COMISSAO_REVISAO_PRONT", "APERFEICOAMENTO_PROFISSIONAL"]},
+        {"nome": "Hospital - Pesquisa de Satisfação (SAU)", "marcadores": ["H_TABELA_PESQUISA_INTERNA", "H_GRAFICO_PESQUISA_INTERNA", "H_TABELA_PESQUISA_RECEPTIVA", "H_GRAFICO_PESQUISA_RECEPTIVA", "H_GRAFICO_PESQUISA_RECEPTIVA_2"]},
+        {"nome": "UPA - Atendimentos e Exames", "marcadores": ["UPA_TABELA_ATENDIMENTOS", "UPA_TABELA_CLASSIFICAÇÃO", "UPA_RELATORIO_MENSAL_RX", "UPA_TABELA_TRANSFERENCIA", "UPA_TABELA_OBITO"]},
+        {"nome": "UPA - Comissões e Qualidade", "marcadores": ["UPA_ATA_OBITO", "UPA_ATA_PRONTUARIO", "UPA_ATA_CCIH", "UPA_APERF_PROF"]},
+        {"nome": "UPA - Pesquisa de Satisfação", "marcadores": ["UPA_TABELA_PESQUISA_INTERNA", "UPA_GRAFICO_PESQUISA_INTERNA", "UPA_TABELA_PESQUISA_RECEPTIVA", "UPA_GRAFICO_PESQUISA_RECEPTIVA", "UPA_GRAFICO_PESQUISA_RECEPTIVA_2"]},
+        {"nome": "Indicadores Gerais", "marcadores": ["TABELA_QUANTI", "TABELA_QUALI"]}
+    ]
+
+    for secao in secoes_evidencias:
+        with st.expander(f"📌 {secao['nome']}", expanded=False):
+            for marcador in secao['marcadores']:
+                # Verificação caso o marcador exista no dicionário de dimensões
+                if marcador in DIMENSOES_CAMPOS:
+                    with st.container(border=True):
+                        # Uso do dicionário LABELS_EVIDENCIAS para mostrar o nome amigável
+                        label_exibicao = LABELS_EVIDENCIAS.get(marcador, marcador)
+                        st.markdown(f"<span class='upload-label'>{label_exibicao} (Largura: {DIMENSOES_CAMPOS[marcador]}mm)</span>", unsafe_allow_html=True)
+                        
+                        f_up = st.file_uploader("Upload", type=['png', 'jpg', 'pdf'], key=f"f_{marcador}", label_visibility="collapsed")
+                        if f_up and f_up.name not in [x['name'] for x in st.session_state.dados_sessao.get(marcador, [])]:
+                            st.session_state.dados_sessao[marcador].append({"name": f_up.name, "content": f_up, "type": "f"})
+                        
+                        kp = f"p_{marcador}_{len(st.session_state.dados_sessao.get(marcador, []))}"
+                        pasted = paste_image_button(label="📸 Colar Print", key=kp)
+                        if pasted is not None and pasted.image_data is not None:
+                            st.session_state.dados_sessao[marcador].append({"name": f"Captura_{marcador}_{int(time.time())}.png", "content": pasted.image_data, "type": "p"})
+                            st.toast(f"Anexado: {label_exibicao}"); time.sleep(0.4); st.rerun()
+                        
+                        if st.session_state.dados_sessao.get(marcador):
+                            for idx, item in enumerate(st.session_state.dados_sessao[marcador]):
+                                col1, col2 = st.columns([0.9, 0.1])
+                                col1.caption(f"📄 {item['name']}")
+                                if col2.button("🗑️", key=f"del_{marcador}_{idx}"): st.session_state.dados_sessao[marcador].pop(idx); st.rerun()
 
 # --- GERAÇÃO FINAL ---
 if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_finalizar"):
@@ -461,4 +518,3 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
     except Exception as e: st.error(f"Erro: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
-
