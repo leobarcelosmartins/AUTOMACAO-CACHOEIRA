@@ -17,7 +17,7 @@ import zipfile
 from pathlib import Path
 
 # --- CONFIGURAÇÕES DE LAYOUT ---
-st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="wide")
+st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="centered")
 
 # --- CUSTOM CSS ---
 st.markdown("""
@@ -554,5 +554,6 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
     except Exception as e: st.error(f"Erro: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
+
 
 
