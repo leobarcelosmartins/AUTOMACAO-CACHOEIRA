@@ -377,7 +377,7 @@ with st.container(border=True):
         # Exportar (Gerar e fazer Download do .zip)
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Espaçamento
         zip_buffer = gerar_backup_zip()
-        nome_backup = f"Backup_Relatorio_{st.session_state.get('sel_mes', 'Atual')}.zip"
+        nome_backup = f"Backup_Relatorio_CACHOEIRA{st.session_state.get('sel_mes', 'Atual')}.zip"
         
         st.download_button(
             label="📤 Guardar Progresso (Baixar .zip)",
@@ -397,7 +397,7 @@ with t_hosp:
         st.markdown("### Período e Internação")
         c1, c2, c3 = st.columns(3)
         with c1: st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], key="sel_mes")
-        with c2: st.selectbox("Ano", [2024, 2025, 2026], index=1, key="sel_ano")
+        with c2: st.selectbox("Ano", [2026, 2027, 2028], index=1, key="sel_ano")
         with c3: st.number_input("Total Pacientes Internados", key="H_T_PAC_INT", step=1)
     
     with st.container(border=True):
@@ -619,20 +619,21 @@ if st.button("FINALIZAR E GERAR RELATÓRIO", type="primary", key="btn_finalizar"
                 cd1, cd2 = st.columns(2)
                 with cd1:
                     with open(docx_p, "rb") as f_w:
-                        st.download_button("WORD (.docx)", f_w.read(), f"RELATÓRIO ASSISTENCIAL MENSAL - SANTA MARIA MADALENA {st.session_state.sel_mes}.docx")
+                        st.download_button("WORD (.docx)", f_w.read(), f"RELATÓRIO ASSISTENCIAL MENSAL - CACHOEIRA {st.session_state.sel_mes}-{st.session_state.sel_ano}.docx")
                 with cd2:
                     try:
                         converter_para_pdf(docx_p, tmp)
                         pdf_p = os.path.join(tmp, "relatorio.pdf")
                         if os.path.exists(pdf_p):
                             with open(pdf_p, "rb") as f_p:
-                                st.download_button("PDF", f_p.read(), f"RELATÓRIO ASSISTENCIAL MENSAL - SANTA MARIA MADALENA {st.session_state.sel_mes}.pdf")
+                                st.download_button("PDF", f_p.read(), f"RELATÓRIO ASSISTENCIAL MENSAL - CACHOEIRA {st.session_state.sel_mes}-{st.session_state.sel_ano}.pdf")
                     except: st.warning("Conversão PDF não disponível no ambiente atual.")
 
     except Exception as e:
         st.error(f"Erro Crítico: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
+
 
 
 
