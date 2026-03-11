@@ -452,7 +452,7 @@ with t_upa:
 
 # --- ABA ARQUIVOS (EVIDÊNCIAS) ---
 with t_evidencia:
-    # Agrupamento para facilitar a navegação (Opcional, mas recomendado)
+
     secoes_evidencias = [
         {"nome": "Hospital - Atendimentos e Classificação", "marcadores": ["PRINT_ATEND_OCUPACAO", "PRINT_CLASSIFICAÇÃO"]},
         {"nome": "Hospital - Cirurgias e Procedimentos", "marcadores": ["GRAFICO_CIRURGIAS_ELETIVAS", "TABELA_CIRURGIAS", "TABELA_RAIOX", "H_T_PROC_CIR"]},
@@ -468,29 +468,63 @@ with t_evidencia:
     for secao in secoes_evidencias:
         with st.expander(f"📌 {secao['nome']}", expanded=False):
             for marcador in secao['marcadores']:
-                # Verificação caso o marcador exista no dicionário de dimensões
                 if marcador in DIMENSOES_CAMPOS:
                     with st.container(border=True):
-                        # Uso do dicionário LABELS_EVIDENCIAS para mostrar o nome amigável
                         label_exibicao = LABELS_EVIDENCIAS.get(marcador, marcador)
-                        st.markdown(f"<span class='upload-label'>{label_exibicao} (Largura: {DIMENSOES_CAMPOS[marcador]}mm)</span>", unsafe_allow_html=True)
-                        
-                        f_up = st.file_uploader("Upload", type=['png', 'jpg', 'pdf'], key=f"f_{marcador}", label_visibility="collapsed")
+                        st.markdown(
+                            f"<span class='upload-label'>{label_exibicao} (Largura: {DIMENSOES_CAMPOS[marcador]}mm)</span>",
+                            unsafe_allow_html=True
+                        )
+                        # Upload de arquivos
+                        f_up = st.file_uploader(
+                            "Upload",
+                            type=['png', 'jpg', 'pdf'],
+                            key=f"f_{marcador}",
+                            label_visibility="collapsed"
+                        )
                         if f_up and f_up.name not in [x['name'] for x in st.session_state.dados_sessao.get(marcador, [])]:
-                            st.session_state.dados_sessao[marcador].append({"name": f_up.name, "content": f_up, "type": "f"})
-                        
+                            st.session_state.dados_sessao[marcador].append({
+                                "name": f_up.name,
+                                "content": f_up,
+                                "type": "f"
+                            })
+                        # Colar print
                         kp = f"p_{marcador}_{len(st.session_state.dados_sessao.get(marcador, []))}"
-                        pasted = paste_image_button(label="📸 Colar Print", key=kp)
+                        pasted = paste_image_button(
+                            label="📸 Colar Print",
+                            key=kp
+                        )
                         if pasted is not None and pasted.image_data is not None:
-                            st.session_state.dados_sessao[marcador].append({"name": f"Captura_{marcador}_{int(time.time())}.png", "content": pasted.image_data, "type": "p"})
-                            st.toast(f"Anexado: {label_exibicao}"); time.sleep(0.4); st.rerun()
-                        
+                            st.session_state.dados_sessao[marcador].append({
+                                "name": f"Captura_{marcador}_{int(time.time())}.png",
+                                "content": pasted.image_data,
+                                "type": "p"
+                            })
+                            st.toast(f"Anexado: {label_exibicao}")
+                            time.sleep(0.4)
+                            st.rerun()
+                        # LISTAGEM DOS ANEXOS
                         if st.session_state.dados_sessao.get(marcador):
                             for idx, item in enumerate(st.session_state.dados_sessao[marcador]):
-                                col1, col2 = st.columns([0.9, 0.1])
-                                col1.caption(f"📄 {item['name']}")
-                                if col2.button("🗑️", key=f"del_{marcador}_{idx}"): st.session_state.dados_sessao[marcador].pop(idx); st.rerun()
+                                # menu recolhível do arquivo
+                                with st.expander(f"📄 {item['name']}", expanded=False):
+                                    # verifica se é imagem
+                                    is_image = (
+                                        item['type'] == "p"
+                                        or item['name'].lower().endswith(('.png', '.jpg', '.jpeg'))
+                                    )
+                                    # preview de imagem
+                                    if is_image:
+                                        st.image(item['content'], use_container_width=True)
 
+                                    # info para pdf
+                                    else:
+                                        ext = item['name'].split('.')[-1].upper()
+                                        st.info(f"Ficheiro {ext} pronto para o relatório.")
+                                    # botão remover
+                                    if st.button("🗑️ Remover", key=f"del_{marcador}_{idx}"):
+                                        st.session_state.dados_sessao[marcador].pop(idx)
+                                        st.rerun()
 # --- GERAÇÃO FINAL ---
 if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_finalizar"):
     try:
@@ -520,4 +554,5 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
     except Exception as e: st.error(f"Erro: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
+
 
