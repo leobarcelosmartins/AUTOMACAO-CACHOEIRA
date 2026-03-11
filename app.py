@@ -4,14 +4,17 @@ from docx.shared import Mm
 import fitz  # PyMuPDF
 import io
 import os
+import json
+import shutil
 import subprocess
 import tempfile
 import pandas as pd
+import matplotlib.pyplot as plt
 from streamlit_paste_button import paste_image_button
 from PIL import Image
 import platform
 import time
-import json
+import calendar
 from pathlib import Path
 
 # --- CONFIGURAÇÕES DE LAYOUT ---
@@ -565,4 +568,5 @@ if st.button("FINALIZAR E GERAR RELATÓRIO", type="primary", key="btn_finalizar"
         st.error(f"Erro Crítico: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
+
 
