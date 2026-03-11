@@ -9,17 +9,15 @@ import shutil
 import subprocess
 import tempfile
 import pandas as pd
-import matplotlib.pyplot as plt
 from streamlit_paste_button import paste_image_button
 from PIL import Image
 import platform
 import time
-import calendar
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 # --- CONFIGURAÇÕES DE LAYOUT ---
-st.set_page_config(page_title="Gerador de Relatórios Cachoeira", layout="centered")
+st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="wide")
 
 # --- CUSTOM CSS ---
 st.markdown("""
@@ -76,11 +74,7 @@ DIMENSOES_CAMPOS = {
     "TABELA_QUANTI": 200, "TABELA_QUALI": 200
 }
 
-# --- DIRETÓRIO DE RELATÓRIOS SALVOS ---
-BASE_RELATORIOS_DIR = Path("relatorios_cachoeira")
-BASE_RELATORIOS_DIR.mkdir(exist_ok=True)
-
-# --- CHAVES DE CAMPOS QUE SERÃO PERSISTIDAS (CONTRATO CACHOEIRA) ---
+# --- CHAVES DE CAMPOS QUE SERÃO PERSISTIDAS ---
 FORM_KEYS = [
     "sel_mes", "sel_ano", "H_T_PAC_INT", "H_ALTA", "H_TRANSF_MAIOR", "H_TRANSF_MENOR",
     "H_TRANSF_INT", "H_EVASAO", "H_OBITO_MAIOR", "H_OBITO_MENOR", "H_OB_INT",
@@ -100,8 +94,6 @@ FORM_KEYS = [
 # --- ESTADO DA SESSÃO ---
 if 'dados_sessao' not in st.session_state:
     st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
-if 'relatorio_atual' not in st.session_state:
-    st.session_state.relatorio_atual = ""
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -145,157 +137,22 @@ def processar_item_lista(doc_template, item, marcador):
             pdf.close(); return imgs
         return [InlineImage(doc_template, item, width=Mm(largura))]
     except: return []
-# --- FUNÇÕES DE PERSISTÊNCIA DE RELATÓRIO ---
-def _normalizar_nome_relatorio(nome: str) -> str:
-    """Transforma o nome em algo seguro para usar como pasta."""
-    nome = nome.strip()
-    for ch in r'\/:*?"<>|':
-        nome = nome.replace(ch, "_")
-    return nome or "relatorio_sem_nome"
 
-
-def listar_relatorios_salvos():
-    if not BASE_RELATORIOS_DIR.exists():
-        return []
-    return sorted([p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()])
-
-
-def _caminho_relatorio(nome_normalizado: str) -> Path:
-    return BASE_RELATORIOS_DIR / nome_normalizado
-
-
-def salvar_relatorio(nome_relatorio: str):
-    if not nome_relatorio:
-        st.warning("Informe um nome para o relatório antes de salvar.")
-        return
-
-    nome_norm = _normalizar_nome_relatorio(nome_relatorio)
-    pasta_rel = _caminho_relatorio(nome_norm)
-    pasta_rel.mkdir(parents=True, exist_ok=True)
-
-    # 1) Salvar estado dos campos
-    form_state = {k: st.session_state.get(k) for k in FORM_KEYS}
-
-    # 2) Salvar evidências em arquivos físicos
-    pasta_evid = pasta_rel / "evidencias"
-    pasta_evid.mkdir(exist_ok=True)
-
-    evidencias_meta = {}
-    for marcador, itens in st.session_state.dados_sessao.items():
-        evidencias_meta[marcador] = []
-        for idx, item in enumerate(itens):
-            nome_arquivo_original = item["name"]
-            tipo = item["type"]
-
-            # Descobrir extensão base a partir do nome original
-            _, ext = os.path.splitext(nome_arquivo_original)
-            ext = ext.lower()
-
-            conteudo = item["content"]
-
-            # NOVO: tratar especificamente imagens PIL (ex.: PngImageFile do paste_image_button)
-            if isinstance(conteudo, Image.Image):
-                buf = io.BytesIO()
-                conteudo.save(buf, format="PNG")
-                data = buf.getvalue()
-                if not ext:
-                    ext = ".png"
-            else:
-                # Conteúdo pode ser UploadedFile, BytesIO, bytes, etc.
-                if hasattr(conteudo, "getvalue"):
-                    data = conteudo.getvalue()
-                elif hasattr(conteudo, "read"):
-                    try:
-                        conteudo.seek(0)
-                    except Exception:
-                        pass
-                    data = conteudo.read()
-                else:
-                    # assume bytes
-                    data = conteudo
-
-                if not ext:
-                    ext = ".bin"
-
-            nome_arquivo_dest = f"{marcador}_{idx}{ext}"
-            caminho_arquivo_dest = pasta_evid / nome_arquivo_dest
-
-            with open(caminho_arquivo_dest, "wb") as f:
-                f.write(data)
-
-            evidencias_meta[marcador].append({
-                "name": nome_arquivo_original,
-                "file": f"evidencias/{nome_arquivo_dest}",
-                "type": tipo
-            })
-
-    # 3) Gravar JSON com o estado completo
-    estado = {
-        "form_state": form_state,
-        "evidencias": evidencias_meta
-    }
-
-    with open(pasta_rel / "estado.json", "w", encoding="utf-8") as f:
-        json.dump(estado, f, ensure_ascii=False, indent=2)
-
-    st.session_state.relatorio_atual = nome_norm
-    st.success(f"Relatório '{nome_relatorio}' salvo com sucesso.")
-
-
-def carregar_relatorio(nome_relatorio: str):
-    nome_norm = _normalizar_nome_relatorio(nome_relatorio)
-    pasta_rel = _caminho_relatorio(nome_norm)
-    estado_path = pasta_rel / "estado.json"
-
-    if not estado_path.exists():
-        st.error("Não foi encontrado estado salvo para este relatório.")
-        return
-
-    with open(estado_path, "r", encoding="utf-8") as f:
-        estado = json.load(f)
-
-    form_state = estado.get("form_state", {})
-    evidencias_meta = estado.get("evidencias", {})
-
-    # 1) Aplicar form_state ao session_state
-    for k, v in form_state.items():
-        st.session_state[k] = v
-
-    # 2) Reconstruir dados_sessao
-    st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
-
-    for marcador, lista_itens in evidencias_meta.items():
-        if marcador not in st.session_state.dados_sessao:
-            st.session_state.dados_sessao[marcador] = []
-        for meta in lista_itens:
-            caminho_arquivo = pasta_rel / meta["file"]
-            if not caminho_arquivo.exists():
-                continue
-            with open(caminho_arquivo, "rb") as f:
-                data = f.read()
-            bio = io.BytesIO(data)
-            bio.name = meta["name"]
-            st.session_state.dados_sessao[marcador].append({
-                "name": meta["name"],
-                "content": bio,
-                "type": meta.get("type", "f")
-            })
-
-    st.session_state.relatorio_atual = nome_norm
-    st.success(f"Relatório '{nome_relatorio}' carregado.")
-
-# --- FUNÇÕES DE EXPORTAR E IMPORTAR (NUVEM / ZIP) ---
+# --- FUNÇÕES DE BACKUP (ZIP) ---
 def gerar_backup_zip():
-    """Cria um ficheiro ZIP em memória contendo o estado.json e as imagens."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         evid_meta = {}
         for marcador, itens in st.session_state.dados_sessao.items():
             evid_meta[marcador] = []
             for i, item in enumerate(itens):
-                # Extrair os bytes da imagem/ficheiro
                 conteudo = item["content"]
                 file_bytes = b""
+                
+                # Identificar extensão real
+                _, ext = os.path.splitext(item["name"])
+                if not ext: ext = ".png"
+
                 if isinstance(conteudo, Image.Image):
                     img_buf = io.BytesIO()
                     conteudo.save(img_buf, format="PNG")
@@ -307,32 +164,22 @@ def gerar_backup_zip():
                         file_bytes = conteudo.read()
                     else: file_bytes = conteudo
                 
-                # Guardar ficheiro dentro do ZIP
-                nome_interno = f"evidencias/{marcador}_{i}.png"
+                nome_interno = f"evidencias/{marcador}_{i}{ext}"
                 zf.writestr(nome_interno, file_bytes)
-                
-                # Registar metadados
                 evid_meta[marcador].append({"name": item["name"], "file": nome_interno, "type": item["type"]})
         
-        # Guardar o estado do formulário no ZIP
         estado = {"form_state": {k: st.session_state.get(k) for k in FORM_KEYS}, "evidencias": evid_meta}
         zf.writestr("estado.json", json.dumps(estado, ensure_ascii=False, indent=2))
-    
     buf.seek(0)
     return buf
 
 def processar_upload_backup(uploaded_zip):
-    """Lê um ficheiro ZIP e restaura todos os dados para a interface."""
     try:
         with zipfile.ZipFile(uploaded_zip, "r") as zf:
-            # 1. Recuperar os textos e números
             estado_str = zf.read("estado.json").decode("utf-8")
             estado = json.loads(estado_str)
-            
             for k, v in estado.get("form_state", {}).items():
                 st.session_state[k] = v
-            
-            # 2. Recuperar as imagens/evidências
             st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
             for marcador, lista in estado.get("evidencias", {}).items():
                 for meta in lista:
@@ -341,52 +188,40 @@ def processar_upload_backup(uploaded_zip):
                         bio = io.BytesIO(file_bytes)
                         bio.name = meta["name"]
                         st.session_state.dados_sessao[marcador].append({
-                            "name": meta["name"], 
-                            "content": bio, 
-                            "type": meta["type"]
+                            "name": meta["name"], "content": bio, "type": meta["type"]
                         })
-                    except Exception as e:
-                        pass # Ignora ficheiros corrompidos no ZIP
-        st.success("✅ Backup importado com sucesso! Pode continuar o seu trabalho.")
+                    except: pass
+        st.success("✅ Backup restaurado com sucesso!")
     except Exception as e:
-        st.error(f"Erro ao ler o ficheiro de backup: {e}")
+        st.error(f"Erro no backup: {e}")
 
 # --- UI PRINCIPAL ---
 st.title("Automação de Relatórios - Cachoeira")
 st.caption("Versão 0.9.3")
 
-# --- GERENCIAMENTO DE RELATÓRIOS SALVOS ---
-# --- BACKUP DE SEGURANÇA (DOWNLOAD/UPLOAD) ---
+# --- CONTAINER DE BACKUP ---
 with st.container(border=True):
     st.markdown("#### ☁️ Backup de Segurança (Exportar / Importar)")
-    st.caption("Utilize esta opção para não perder os seus dados caso o servidor reinicie.")
-    
     col_up, col_down = st.columns(2)
-    
     with col_up:
-        # Importar (Upload do ficheiro .zip)
-        zip_upload = st.file_uploader("📥 Retomar Relatório (Carregar .zip)", type=["zip"], key="upload_backup")
+        zip_upload = st.file_uploader("📥 Retomar Relatório (.zip)", type=["zip"], key="upload_backup")
         if zip_upload:
-            # Processa o upload apenas se um botão for clicado para evitar recarregamentos acidentais
-            if st.button("Restaurar Dados do ZIP", key="btn_restore", use_container_width=True):
+            if st.button("Restaurar Dados do ZIP", use_container_width=True):
                 processar_upload_backup(zip_upload)
                 time.sleep(1)
                 st.rerun()
-
     with col_down:
-        # Exportar (Gerar e fazer Download do .zip)
-        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Espaçamento
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         zip_buffer = gerar_backup_zip()
-        nome_backup = f"Backup_Relatorio_CACHOEIRA{st.session_state.get('sel_mes', 'Atual')}.zip"
-        
         st.download_button(
-            label="📤 Guardar Progresso (Baixar .zip)",
+            label="📤 Guardar Progresso (.zip)",
             data=zip_buffer,
-            file_name=nome_backup,
+            file_name=f"Backup_Cachoeira_{st.session_state.get('sel_mes', 'Atual')}.zip",
             mime="application/zip",
             type="primary",
             use_container_width=True
         )
+
 t_hosp, t_amb, t_cir, t_upa, t_evidencia = st.tabs(
     ["HOSPITAL", "AMBULATÓRIO/PARECER", "CIRURGIAS/EXAMES", "UPA", "ARQUIVOS"]
 )
@@ -397,7 +232,7 @@ with t_hosp:
         st.markdown("### Período e Internação")
         c1, c2, c3 = st.columns(3)
         with c1: st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], key="sel_mes")
-        with c2: st.selectbox("Ano", [2026, 2027, 2028], index=1, key="sel_ano")
+        with c2: st.selectbox("Ano", [2024, 2025, 2026], index=1, key="sel_ano")
         with c3: st.number_input("Total Pacientes Internados", key="H_T_PAC_INT", step=1)
     
     with st.container(border=True):
@@ -532,18 +367,12 @@ with t_evidencia:
             if f_up and f_up.name not in [x['name'] for x in st.session_state.dados_sessao.get(marcador, [])]:
                 st.session_state.dados_sessao[marcador].append({"name": f_up.name, "content": f_up, "type": "f"})
             
-            # CORREÇÃO DO LOOP INFINITO: Chave dinâmica baseada no número de itens
             kp = f"p_{marcador}_{len(st.session_state.dados_sessao.get(marcador, []))}"
             pasted = paste_image_button(label="📸 Colar Print", key=kp)
             if pasted is not None and pasted.image_data is not None:
-                st.session_state.dados_sessao[marcador].append(
-                    {
-                        "name": f"Captura_{marcador}_{int(time.time())}.png", 
-                        "content": pasted.image_data, 
-                        "type": "p"
-                    }
-                )
-                # Feedback de sucesso
+                st.session_state.dados_sessao[marcador].append({
+                    "name": f"Captura_{marcador}_{int(time.time())}.png", "content": pasted.image_data, "type": "p"
+                })
                 st.toast(f"Anexado: {marcador}")
                 time.sleep(0.4)
                 st.rerun()
@@ -603,7 +432,6 @@ if st.button("FINALIZAR E GERAR RELATÓRIO", type="primary", key="btn_finalizar"
                     "H_TOTAL_SAU_PESQ": st.session_state.get("H_SAU_PESQ_INT", 0) + st.session_state.get("H_SAU_OUV_RECEP", 0)
                 })
 
-                # PROCESSAMENTO DE EVIDÊNCIAS
                 for m in DIMENSOES_CAMPOS.keys():
                     imgs_word = []
                     for item in st.session_state.dados_sessao.get(m, []):
@@ -619,21 +447,17 @@ if st.button("FINALIZAR E GERAR RELATÓRIO", type="primary", key="btn_finalizar"
                 cd1, cd2 = st.columns(2)
                 with cd1:
                     with open(docx_p, "rb") as f_w:
-                        st.download_button("WORD (.docx)", f_w.read(), f"RELATÓRIO ASSISTENCIAL MENSAL - CACHOEIRA {st.session_state.sel_mes}-{st.session_state.sel_ano}.docx")
+                        st.download_button("WORD (.docx)", f_w.read(), f"RELATORIO_CACHOEIRA_{st.session_state.sel_mes}.docx")
                 with cd2:
                     try:
                         converter_para_pdf(docx_p, tmp)
                         pdf_p = os.path.join(tmp, "relatorio.pdf")
                         if os.path.exists(pdf_p):
                             with open(pdf_p, "rb") as f_p:
-                                st.download_button("PDF", f_p.read(), f"RELATÓRIO ASSISTENCIAL MENSAL - CACHOEIRA {st.session_state.sel_mes}-{st.session_state.sel_ano}.pdf")
-                    except: st.warning("Conversão PDF não disponível no ambiente atual.")
+                                st.download_button("PDF", f_p.read(), f"RELATORIO_CACHOEIRA_{st.session_state.sel_mes}.pdf")
+                    except: st.warning("Conversão PDF não disponível.")
 
     except Exception as e:
         st.error(f"Erro Crítico: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
-
-
-
-
