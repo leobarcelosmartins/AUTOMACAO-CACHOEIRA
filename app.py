@@ -341,7 +341,7 @@ with t_hosp:
         st.markdown("### Período e Internação")
         c1, c2, c3 = st.columns(3)
         with c1: st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], key="sel_mes")
-        with c2: st.selectbox("Ano", [2024, 2025, 2026], index=1, key="sel_ano")
+        with c2: st.selectbox("Ano", [2026, 2027, 2028], index=1, key="sel_ano")
         with c3: st.number_input("Total Pacientes Internados", key="H_T_PAC_INT", step=1)
     
     with st.container(border=True):
@@ -554,6 +554,7 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
     except Exception as e: st.error(f"Erro: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
+
 
 
 
