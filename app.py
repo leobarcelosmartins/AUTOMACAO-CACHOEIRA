@@ -252,23 +252,26 @@ def processar_item_lista(doc_template, item, marcador):
 
 # --- UI PRINCIPAL ---
 st.title("Automação de Relatórios - Cachoeira")
-
+# ----------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------
 # --- GESTOR DE RELATÓRIOS (ESTILO DA IMAGEM) ---
-with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session_state.relatorio_atual):
-    col_g1, col_g2 = st.columns([2, 1])
-    with col_g1:
-        lista_pastas = [p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()]
-        sel_disco = st.selectbox("Relatórios Guardados", ["-- Selecionar --"] + lista_pastas)
-        ca1, ca2 = st.columns(2)
-        if ca1.button("📥 Carregar Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
-            carregar_relatorio(sel_disco)
-            st.rerun()
-        if ca2.button("🗑️ Excluir Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
-            excluir_relatorio(sel_disco)
-    with col_g2:
-        novo_nome = st.text_input("Nome do Relatório", placeholder="Ex: Pacheco_Marco_2025", value=st.session_state.relatorio_atual)
-        if st.button("💾 Salvar Progresso", use_container_width=True, type="primary"):
-            salvar_relatorio(novo_nome)
+# with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session_state.relatorio_atual):
+#     col_g1, col_g2 = st.columns([2, 1])
+#    with col_g1:
+#         lista_pastas = [p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()]
+#         sel_disco = st.selectbox("Relatórios Guardados", ["-- Selecionar --"] + lista_pastas)
+#         ca1, ca2 = st.columns(2)
+#         if ca1.button("📥 Carregar Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
+#             carregar_relatorio(sel_disco)
+#             st.rerun()
+#         if ca2.button("🗑️ Excluir Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
+#             excluir_relatorio(sel_disco)
+#     with col_g2:
+#         novo_nome = st.text_input("Nome do Relatório", placeholder="Ex: Pacheco_Marco_2025", value=st.session_state.relatorio_atual)
+#         if st.button("💾 Salvar Progresso", use_container_width=True, type="primary"):
+#             salvar_relatorio(novo_nome)
+# ----------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------
 
 # --- BACKUP EXTERNO (ZIP) - MESMO ESTILO ---
 with st.expander("☁️ Backup Externo (Importar / Exportar ZIP)", expanded=False):
@@ -458,3 +461,4 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
     except Exception as e: st.error(f"Erro: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
+
