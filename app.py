@@ -33,8 +33,9 @@ st.markdown("""
         margin-bottom: 20px !important;
     }
     
+    /* BOTÃO PRIMÁRIO VERDE (CONFORME IMAGEM) */
     div.stButton > button[kind="primary"] {
-        background-color: #2c86b0 !important;
+        background-color: #28a745 !important;
         color: white !important;
         border: none !important;
         width: 100% !important;
@@ -42,6 +43,15 @@ st.markdown("""
         height: 3em !important;
         border-radius: 8px !important;
     }
+    
+    /* BOTÃO SECUNDÁRIO PADRÃO */
+    div.stButton > button[kind="secondary"] {
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+        height: 3em !important;
+        width: 100% !important;
+    }
+
     div.stButton > button[key*="del_"] {
         border: 1px solid #dc3545 !important;
         color: #dc3545 !important;
@@ -53,7 +63,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- DICIONÁRIO DE DIMENSÕES DAS EVIDÊNCIAS (CONFORME PDF CACHOEIRA) ---
+# --- DICIONÁRIO DE DIMENSÕES DAS EVIDÊNCIAS ---
 DIMENSOES_CAMPOS = {
     "PRINT_ATEND_OCUPACAO": 165, "PRINT_CLASSIFICAÇÃO": 165,
     "GRAFICO_CIRURGIAS_ELETIVAS": 125, "TABELA_CIRURGIAS": 190,
@@ -94,16 +104,82 @@ FORM_KEYS = [
 # --- ESTADO DA SESSÃO ---
 if 'dados_sessao' not in st.session_state:
     st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
+if 'relatorio_atual' not in st.session_state:
+    st.session_state.relatorio_atual = ""
 
-# --- SIDEBAR ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3208/3208726.png", width=100)
-    st.title("Painel de Controle")
-    st.markdown("---")
-    total_anexos = sum(len(v) for v in st.session_state.dados_sessao.values())
-    st.metric("Total de Evidências", total_anexos)
-    if st.button(" 🗑️ Limpar Todos os Dados", key="btn_limpar_tudo"):
-        st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
+BASE_RELATORIOS_DIR = Path("relatorios_guardados")
+BASE_RELATORIOS_DIR.mkdir(exist_ok=True)
+
+# --- FUNÇÕES DE PERSISTÊNCIA EM DISCO ---
+def _normalizar_nome(nome):
+    return "".join([c if c.isalnum() else "_" for c in nome.strip()])
+
+def salvar_relatorio(nome):
+    if not nome:
+        st.warning("Informe um nome para o relatório.")
+        return
+    
+    pasta = BASE_RELATORIOS_DIR / _normalizar_nome(nome)
+    pasta.mkdir(exist_ok=True)
+    
+    evid_meta = {}
+    pasta_evid = pasta / "evidencias"
+    pasta_evid.mkdir(exist_ok=True)
+    
+    for m, itens in st.session_state.dados_sessao.items():
+        evid_meta[m] = []
+        for i, item in enumerate(itens):
+            _, ext = os.path.splitext(item["name"])
+            if not ext: ext = ".png"
+            nome_arq = f"{m}_{i}{ext}"
+            
+            conteudo = item["content"]
+            if isinstance(conteudo, Image.Image):
+                conteudo.save(pasta_evid / nome_arq, format="PNG")
+            else:
+                if hasattr(conteudo, "getvalue"): data = conteudo.getvalue()
+                else: 
+                    conteudo.seek(0)
+                    data = conteudo.read()
+                with open(pasta_evid / nome_arq, "wb") as f: f.write(data)
+                
+            evid_meta[m].append({"name": item["name"], "file": f"evidencias/{nome_arq}", "type": item["type"]})
+
+    estado = {
+        "form_state": {k: st.session_state.get(k) for k in FORM_KEYS},
+        "evidencias": evid_meta
+    }
+    with open(pasta / "estado.json", "w", encoding="utf-8") as f:
+        json.dump(estado, f, ensure_ascii=False, indent=2)
+    
+    st.session_state.relatorio_atual = nome
+    st.success(f"Relatório '{nome}' salvo com sucesso!")
+
+def carregar_relatorio(nome):
+    pasta = BASE_RELATORIOS_DIR / nome
+    with open(pasta / "estado.json", "r", encoding="utf-8") as f:
+        estado = json.load(f)
+    
+    for k, v in estado["form_state"].items():
+        st.session_state[k] = v
+        
+    st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
+    for m, lista in estado["evidencias"].items():
+        for meta in lista:
+            with open(pasta / meta["file"], "rb") as f:
+                data = f.read()
+            bio = io.BytesIO(data)
+            bio.name = meta["name"]
+            st.session_state.dados_sessao[m].append({"name": meta["name"], "content": bio, "type": meta["type"]})
+    
+    st.session_state.relatorio_atual = nome
+    st.toast(f"Relatório '{nome}' carregado.")
+
+def excluir_relatorio(nome):
+    pasta = BASE_RELATORIOS_DIR / nome
+    if pasta.exists():
+        shutil.rmtree(pasta)
+        st.success(f"Relatório '{nome}' excluído.")
         st.rerun()
 
 # --- FUNÇÕES CORE ---
@@ -138,89 +214,36 @@ def processar_item_lista(doc_template, item, marcador):
         return [InlineImage(doc_template, item, width=Mm(largura))]
     except: return []
 
-# --- FUNÇÕES DE BACKUP (ZIP) ---
-def gerar_backup_zip():
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        evid_meta = {}
-        for marcador, itens in st.session_state.dados_sessao.items():
-            evid_meta[marcador] = []
-            for i, item in enumerate(itens):
-                conteudo = item["content"]
-                file_bytes = b""
-                
-                # Identificar extensão real
-                _, ext = os.path.splitext(item["name"])
-                if not ext: ext = ".png"
-
-                if isinstance(conteudo, Image.Image):
-                    img_buf = io.BytesIO()
-                    conteudo.save(img_buf, format="PNG")
-                    file_bytes = img_buf.getvalue()
-                else:
-                    if hasattr(conteudo, "getvalue"): file_bytes = conteudo.getvalue()
-                    elif hasattr(conteudo, "read"): 
-                        conteudo.seek(0)
-                        file_bytes = conteudo.read()
-                    else: file_bytes = conteudo
-                
-                nome_interno = f"evidencias/{marcador}_{i}{ext}"
-                zf.writestr(nome_interno, file_bytes)
-                evid_meta[marcador].append({"name": item["name"], "file": nome_interno, "type": item["type"]})
-        
-        estado = {"form_state": {k: st.session_state.get(k) for k in FORM_KEYS}, "evidencias": evid_meta}
-        zf.writestr("estado.json", json.dumps(estado, ensure_ascii=False, indent=2))
-    buf.seek(0)
-    return buf
-
-def processar_upload_backup(uploaded_zip):
-    try:
-        with zipfile.ZipFile(uploaded_zip, "r") as zf:
-            estado_str = zf.read("estado.json").decode("utf-8")
-            estado = json.loads(estado_str)
-            for k, v in estado.get("form_state", {}).items():
-                st.session_state[k] = v
-            st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
-            for marcador, lista in estado.get("evidencias", {}).items():
-                for meta in lista:
-                    try:
-                        file_bytes = zf.read(meta["file"])
-                        bio = io.BytesIO(file_bytes)
-                        bio.name = meta["name"]
-                        st.session_state.dados_sessao[marcador].append({
-                            "name": meta["name"], "content": bio, "type": meta["type"]
-                        })
-                    except: pass
-        st.success("✅ Backup restaurado com sucesso!")
-    except Exception as e:
-        st.error(f"Erro no backup: {e}")
+# --- SIDEBAR ---
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/3208/3208726.png", width=100)
+    st.title("Painel de Controle")
+    st.markdown("---")
+    total_anexos = sum(len(v) for v in st.session_state.dados_sessao.values())
+    st.metric("Total de Evidências", total_anexos)
+    if st.button(" 🗑️ Limpar Todos os Dados", key="btn_limpar_tudo"):
+        st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
+        st.rerun()
 
 # --- UI PRINCIPAL ---
 st.title("Automação de Relatórios - Cachoeira")
-st.caption("Versão 0.9.3")
 
-# --- CONTAINER DE BACKUP ---
-with st.container(border=True):
-    st.markdown("#### ☁️ Backup de Segurança (Exportar / Importar)")
-    col_up, col_down = st.columns(2)
-    with col_up:
-        zip_upload = st.file_uploader("📥 Retomar Relatório (.zip)", type=["zip"], key="upload_backup")
-        if zip_upload:
-            if st.button("Restaurar Dados do ZIP", use_container_width=True):
-                processar_upload_backup(zip_upload)
-                time.sleep(1)
-                st.rerun()
-    with col_down:
-        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        zip_buffer = gerar_backup_zip()
-        st.download_button(
-            label="📤 Guardar Progresso (.zip)",
-            data=zip_buffer,
-            file_name=f"Backup_Cachoeira_{st.session_state.get('sel_mes', 'Atual')}.zip",
-            mime="application/zip",
-            type="primary",
-            use_container_width=True
-        )
+# --- GESTOR DE RELATÓRIOS (CONFORME IMAGEM) ---
+with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session_state.relatorio_atual):
+    col_g1, col_g2 = st.columns([2, 1])
+    with col_g1:
+        lista_pastas = [p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()]
+        sel_disco = st.selectbox("Relatórios Guardados", ["-- Selecionar --"] + lista_pastas)
+        ca1, ca2 = st.columns(2)
+        if ca1.button("📥 Carregar Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
+            carregar_relatorio(sel_disco)
+            st.rerun()
+        if ca2.button("🗑️ Excluir Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
+            excluir_relatorio(sel_disco)
+    with col_g2:
+        novo_nome = st.text_input("Nome do Relatório", placeholder="Ex: Pacheco_Marco_2025", value=st.session_state.relatorio_atual)
+        if st.button("💾 Salvar Progresso", use_container_width=True, type="primary"):
+            salvar_relatorio(novo_nome)
 
 t_hosp, t_amb, t_cir, t_upa, t_evidencia = st.tabs(
     ["HOSPITAL", "AMBULATÓRIO/PARECER", "CIRURGIAS/EXAMES", "UPA", "ARQUIVOS"]
@@ -385,7 +408,7 @@ with t_evidencia:
                         st.session_state.dados_sessao[marcador].pop(idx); st.rerun()
 
 # --- GERAÇÃO FINAL ---
-if st.button("FINALIZAR E GERAR RELATÓRIO", type="primary", key="btn_finalizar"):
+if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_finalizar"):
     try:
         with st.spinner("Processando indicadores e gerando documento..."):
             with tempfile.TemporaryDirectory() as tmp:
