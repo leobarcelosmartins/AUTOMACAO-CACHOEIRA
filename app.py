@@ -16,6 +16,7 @@ import platform
 import time
 import calendar
 from pathlib import Path
+import zipfile
 
 # --- CONFIGURAÇÕES DE LAYOUT ---
 st.set_page_config(page_title="Gerador de Relatórios Cachoeira", layout="centered")
@@ -283,45 +284,109 @@ def carregar_relatorio(nome_relatorio: str):
     st.session_state.relatorio_atual = nome_norm
     st.success(f"Relatório '{nome_relatorio}' carregado.")
 
+# --- FUNÇÕES DE EXPORTAR E IMPORTAR (NUVEM / ZIP) ---
+def gerar_backup_zip():
+    """Cria um ficheiro ZIP em memória contendo o estado.json e as imagens."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        evid_meta = {}
+        for marcador, itens in st.session_state.dados_sessao.items():
+            evid_meta[marcador] = []
+            for i, item in enumerate(itens):
+                # Extrair os bytes da imagem/ficheiro
+                conteudo = item["content"]
+                file_bytes = b""
+                if isinstance(conteudo, Image.Image):
+                    img_buf = io.BytesIO()
+                    conteudo.save(img_buf, format="PNG")
+                    file_bytes = img_buf.getvalue()
+                else:
+                    if hasattr(conteudo, "getvalue"): file_bytes = conteudo.getvalue()
+                    elif hasattr(conteudo, "read"): 
+                        conteudo.seek(0)
+                        file_bytes = conteudo.read()
+                    else: file_bytes = conteudo
+                
+                # Guardar ficheiro dentro do ZIP
+                nome_interno = f"evidencias/{marcador}_{i}.png"
+                zf.writestr(nome_interno, file_bytes)
+                
+                # Registar metadados
+                evid_meta[marcador].append({"name": item["name"], "file": nome_interno, "type": item["type"]})
+        
+        # Guardar o estado do formulário no ZIP
+        estado = {"form_state": {k: st.session_state.get(k) for k in FORM_KEYS}, "evidencias": evid_meta}
+        zf.writestr("estado.json", json.dumps(estado, ensure_ascii=False, indent=2))
+    
+    buf.seek(0)
+    return buf
+
+def processar_upload_backup(uploaded_zip):
+    """Lê um ficheiro ZIP e restaura todos os dados para a interface."""
+    try:
+        with zipfile.ZipFile(uploaded_zip, "r") as zf:
+            # 1. Recuperar os textos e números
+            estado_str = zf.read("estado.json").decode("utf-8")
+            estado = json.loads(estado_str)
+            
+            for k, v in estado.get("form_state", {}).items():
+                st.session_state[k] = v
+            
+            # 2. Recuperar as imagens/evidências
+            st.session_state.dados_sessao = {m: [] for m in DIMENSOES_CAMPOS.keys()}
+            for marcador, lista in estado.get("evidencias", {}).items():
+                for meta in lista:
+                    try:
+                        file_bytes = zf.read(meta["file"])
+                        bio = io.BytesIO(file_bytes)
+                        bio.name = meta["name"]
+                        st.session_state.dados_sessao[marcador].append({
+                            "name": meta["name"], 
+                            "content": bio, 
+                            "type": meta["type"]
+                        })
+                    except Exception as e:
+                        pass # Ignora ficheiros corrompidos no ZIP
+        st.success("✅ Backup importado com sucesso! Pode continuar o seu trabalho.")
+    except Exception as e:
+        st.error(f"Erro ao ler o ficheiro de backup: {e}")
+
 # --- UI PRINCIPAL ---
 st.title("Automação de Relatórios - Cachoeira")
 st.caption("Versão 0.9.3")
 
 # --- GERENCIAMENTO DE RELATÓRIOS SALVOS ---
+# --- BACKUP DE SEGURANÇA (DOWNLOAD/UPLOAD) ---
 with st.container(border=True):
-    st.markdown("#### Gerenciamento de Relatórios")
-
-    col1, col2, col3 = st.columns([2, 2, 1])
-
-    with col1:
-        relatorios_existentes = listar_relatorios_salvos()
-        opcao_rel = st.selectbox(
-            "Relatórios salvos",
-            ["(Novo relatório)"] + relatorios_existentes,
-            index=0
-        )
-
-    with col2:
-        nome_input = st.text_input(
-            "Nome do relatório",
-            value=st.session_state.relatorio_atual or ""
-        )
-
-    with col3:
-        if st.button("Carregar", key="btn_carregar_relatorio"):
-            if opcao_rel != "(Novo relatório)":
-                carregar_relatorio(opcao_rel)
+    st.markdown("#### ☁️ Backup de Segurança (Exportar / Importar)")
+    st.caption("Utilize esta opção para não perder os seus dados caso o servidor reinicie.")
+    
+    col_up, col_down = st.columns(2)
+    
+    with col_up:
+        # Importar (Upload do ficheiro .zip)
+        zip_upload = st.file_uploader("📥 Retomar Relatório (Carregar .zip)", type=["zip"], key="upload_backup")
+        if zip_upload:
+            # Processa o upload apenas se um botão for clicado para evitar recarregamentos acidentais
+            if st.button("Restaurar Dados do ZIP", key="btn_restore", use_container_width=True):
+                processar_upload_backup(zip_upload)
+                time.sleep(1)
                 st.rerun()
-            else:
-                st.warning("Selecione um relatório salvo para carregar.")
 
-        if st.button("Salvar", key="btn_salvar_relatorio"):
-            nome_para_salvar = nome_input or opcao_rel
-            if not nome_para_salvar or nome_para_salvar == "(Novo relatório)":
-                st.warning("Digite um nome para o relatório antes de salvar.")
-            else:
-                salvar_relatorio(nome_para_salvar)
-
+    with col_down:
+        # Exportar (Gerar e fazer Download do .zip)
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Espaçamento
+        zip_buffer = gerar_backup_zip()
+        nome_backup = f"Backup_Relatorio_{st.session_state.get('sel_mes', 'Atual')}.zip"
+        
+        st.download_button(
+            label="📤 Guardar Progresso (Baixar .zip)",
+            data=zip_buffer,
+            file_name=nome_backup,
+            mime="application/zip",
+            type="primary",
+            use_container_width=True
+        )
 t_hosp, t_amb, t_cir, t_upa, t_evidencia = st.tabs(
     ["HOSPITAL", "AMBULATÓRIO/PARECER", "CIRURGIAS/EXAMES", "UPA", "ARQUIVOS"]
 )
@@ -568,5 +633,6 @@ if st.button("FINALIZAR E GERAR RELATÓRIO", type="primary", key="btn_finalizar"
         st.error(f"Erro Crítico: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
+
 
 
