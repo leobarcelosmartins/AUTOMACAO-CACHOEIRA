@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 
 # --- CONFIGURAÇÕES DE LAYOUT ---
+# Alterado para wide para suportar o layout horizontal do Gestor
 st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="centered")
 
 # --- CUSTOM CSS ---
@@ -33,7 +34,7 @@ st.markdown("""
         margin-bottom: 20px !important;
     }
     
-    /* BOTÃO PRIMÁRIO VERDE (CONFORME IMAGEM) */
+    /* BOTÃO PRIMÁRIO VERDE (CONFORME IMAGEM DO GESTOR) */
     div.stButton > button[kind="primary"] {
         background-color: #28a745 !important;
         color: white !important;
@@ -44,7 +45,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* BOTÃO SECUNDÁRIO PADRÃO (BORDA CINZA) */
+    /* BOTÃO SECUNDÁRIO PADRÃO (CARREGAR / EXCLUIR) */
     div.stButton > button[kind="secondary"] {
         background-color: #ffffff !important;
         border: 1px solid #d1d5db !important;
@@ -149,7 +150,7 @@ if 'relatorio_atual' not in st.session_state:
 BASE_RELATORIOS_DIR = Path("relatorios_guardados")
 BASE_RELATORIOS_DIR.mkdir(exist_ok=True)
 
-# --- FUNÇÕES DE PERSISTÊNCIA (DISCO LOCAL) ---
+# --- FUNÇÕES DE PERSISTÊNCIA ---
 def _normalizar_nome(nome):
     return "".join([c if c.isalnum() else "_" for c in nome.strip()])
 
@@ -291,24 +292,22 @@ def processar_item_lista(doc_template, item, marcador):
 # --- UI PRINCIPAL ---
 st.title("Automação de Relatórios - Cachoeira")
 
-#--------------------------------------------------------------------------------------------
 # --- GESTOR DE RELATÓRIOS (ESTILO DA IMAGEM) ---
-# with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session_state.relatorio_atual):
-#    col_g1, col_g2 = st.columns([2, 1])
-#    with col_g1:
-#        lista_pastas = [p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()]
-#        sel_disco = st.selectbox("Relatórios Guardados", ["-- Selecionar --"] + lista_pastas)
-#        ca1, ca2 = st.columns(2)
-#        if ca1.button("📥 Carregar Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
-#            carregar_relatorio(sel_disco)
-#            st.rerun()
-#        if ca2.button("🗑️ Excluir Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
-#            excluir_relatorio(sel_disco)
-#    with col_g2:
-#        novo_nome = st.text_input("Nome do Relatório", placeholder="Ex: Pacheco_Marco_2025", value=st.session_state.relatorio_atual)
-#        if st.button("💾 Salvar Progresso", use_container_width=True, type="primary"):
-#            salvar_relatorio(novo_nome)
-#--------------------------------------------------------------------------------------------
+with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session_state.relatorio_atual):
+    col_g1, col_g2 = st.columns([2, 1])
+    with col_g1:
+        lista_pastas = [p.name for p in BASE_RELATORIOS_DIR.iterdir() if p.is_dir()]
+        sel_disco = st.selectbox("Relatórios Guardados", ["-- Selecionar --"] + lista_pastas)
+        ca1, ca2 = st.columns(2)
+        if ca1.button("📥 Carregar Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
+            carregar_relatorio(sel_disco)
+            st.rerun()
+        if ca2.button("🗑️ Excluir Selecionado", use_container_width=True) and sel_disco != "-- Selecionar --":
+            excluir_relatorio(sel_disco)
+    with col_g2:
+        novo_nome = st.text_input("Nome do Relatório", placeholder="Ex: Pacheco_Marco_2025", value=st.session_state.relatorio_atual)
+        if st.button("💾 Salvar Progresso", use_container_width=True, type="primary"):
+            salvar_relatorio(novo_nome)
 
 # --- BACKUP EXTERNO (ZIP) - MESMO ESTILO ---
 with st.expander("☁️ Backup Externo (Importar / Exportar ZIP)", expanded=False):
@@ -320,7 +319,7 @@ with st.expander("☁️ Backup Externo (Importar / Exportar ZIP)", expanded=Fal
             time.sleep(1)
             st.rerun()
     with col_z2:
-        st.markdown("<div style='height: 2px;'></div>", unsafe_allow_html=True) # Alinhamento visual
+        st.markdown("<div style='height: 2px;'></div>", unsafe_allow_html=True)
         zip_data = gerar_backup_zip()
         st.download_button(
             label="📤 Baixar Backup ZIP",
@@ -341,7 +340,7 @@ with t_hosp:
         st.markdown("### Período e Internação")
         c1, c2, c3 = st.columns(3)
         with c1: st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], key="sel_mes")
-        with c2: st.selectbox("Ano", [2026, 2027, 2028], index=1, key="sel_ano")
+        with c2: st.selectbox("Ano", [2026, 2027, 2028], index=0, key="sel_ano")
         with c3: st.number_input("Total Pacientes Internados", key="H_T_PAC_INT", step=1)
     
     with st.container(border=True):
@@ -449,13 +448,18 @@ with t_upa:
         with c2: st.number_input("Laboratório UPA", key="UPA_EX_LAB", step=1)
         with c3: st.number_input("Radiografia UPA", key="UPA_EX_RADIO", step=1)
         with c4: st.number_input("Total Transferências UPA", key="UPA_T_TRANSF", step=1)
+    with st.container(border=True):
+        st.markdown("### Pesquisa de Satisfação UPA")
+        c1, c2 = st.columns(2)
+        with c1: st.number_input("Pesquisa Interna UPA", key="UPA_PESQ_INT", step=1)
+        with c2: st.number_input("Pesquisa Receptiva UPA", key="UPA_PESQ_RECEP", step=1)
 
 # --- ABA ARQUIVOS (EVIDÊNCIAS) ---
 with t_evidencia:
-
+    # Agrupamento conforme solicitado anteriormente para melhor navegação
     secoes_evidencias = [
         {"nome": "Hospital - Atendimentos e Classificação", "marcadores": ["PRINT_ATEND_OCUPACAO", "PRINT_CLASSIFICAÇÃO"]},
-        {"nome": "Hospital - Cirurgias e Procedimentos", "marcadores": ["GRAFICO_CIRURGIAS_ELETIVAS", "TABELA_CIRURGIAS", "TABELA_RAIOX", "H_T_PROC_CIR"]},
+        {"nome": "Hospital - Cirurgias e Procedimentos", "marcadores": ["GRAFICO_CIRURGIAS_ELETIVAS", "TABELA_CIRURGIAS", "TABELA_RAIOX"]},
         {"nome": "Hospital - Transferências e Óbitos", "marcadores": ["TABELA_CONS_TRANSFERENCIA", "TABELA_DET_TRANSFERENCIA", "TABELA_OBITO", "ATA_OBITO"]},
         {"nome": "Hospital - Comissões e Qualidade", "marcadores": ["TABELA_CCIH", "ATA_COMISSAO_CCIH", "ATA_COMISSAO_REVISAO_PRONT", "APERFEICOAMENTO_PROFISSIONAL"]},
         {"nome": "Hospital - Pesquisa de Satisfação (SAU)", "marcadores": ["H_TABELA_PESQUISA_INTERNA", "H_GRAFICO_PESQUISA_INTERNA", "H_TABELA_PESQUISA_RECEPTIVA", "H_GRAFICO_PESQUISA_RECEPTIVA", "H_GRAFICO_PESQUISA_RECEPTIVA_2"]},
@@ -470,61 +474,31 @@ with t_evidencia:
             for marcador in secao['marcadores']:
                 if marcador in DIMENSOES_CAMPOS:
                     with st.container(border=True):
+                        # Implementação da melhoria das Labels
                         label_exibicao = LABELS_EVIDENCIAS.get(marcador, marcador)
-                        st.markdown(
-                            f"<span class='upload-label'>{label_exibicao} (Largura: {DIMENSOES_CAMPOS[marcador]}mm)</span>",
-                            unsafe_allow_html=True
-                        )
-                        # Upload de arquivos
-                        f_up = st.file_uploader(
-                            "Upload",
-                            type=['png', 'jpg', 'pdf'],
-                            key=f"f_{marcador}",
-                            label_visibility="collapsed"
-                        )
+                        st.markdown(f"<span class='upload-label'>{label_exibicao} (Largura: {DIMENSOES_CAMPOS[marcador]}mm)</span>", unsafe_allow_html=True)
+                        
+                        f_up = st.file_uploader("Upload", type=['png', 'jpg', 'pdf'], key=f"f_{marcador}", label_visibility="collapsed")
                         if f_up and f_up.name not in [x['name'] for x in st.session_state.dados_sessao.get(marcador, [])]:
-                            st.session_state.dados_sessao[marcador].append({
-                                "name": f_up.name,
-                                "content": f_up,
-                                "type": "f"
-                            })
-                        # Colar print
+                            st.session_state.dados_sessao[marcador].append({"name": f_up.name, "content": f_up, "type": "f"})
+                        
                         kp = f"p_{marcador}_{len(st.session_state.dados_sessao.get(marcador, []))}"
-                        pasted = paste_image_button(
-                            label="📸 Colar Print",
-                            key=kp
-                        )
+                        pasted = paste_image_button(label="📸 Colar Print", key=kp)
                         if pasted is not None and pasted.image_data is not None:
                             st.session_state.dados_sessao[marcador].append({
-                                "name": f"Captura_{marcador}_{int(time.time())}.png",
-                                "content": pasted.image_data,
-                                "type": "p"
+                                "name": f"Captura_{marcador}_{int(time.time())}.png", "content": pasted.image_data, "type": "p"
                             })
-                            st.toast(f"Anexado: {label_exibicao}")
-                            time.sleep(0.4)
-                            st.rerun()
-                        # LISTAGEM DOS ANEXOS
+                            st.toast(f"Anexado: {label_exibicao}"); time.sleep(0.4); st.rerun()
+                        
                         if st.session_state.dados_sessao.get(marcador):
                             for idx, item in enumerate(st.session_state.dados_sessao[marcador]):
-                                # menu recolhível do arquivo
                                 with st.expander(f"📄 {item['name']}", expanded=False):
-                                    # verifica se é imagem
-                                    is_image = (
-                                        item['type'] == "p"
-                                        or item['name'].lower().endswith(('.png', '.jpg', '.jpeg'))
-                                    )
-                                    # preview de imagem
-                                    if is_image:
-                                        st.image(item['content'], use_container_width=True)
+                                    is_img = item['type'] == "p" or item['name'].lower().endswith(('.png', '.jpg', '.jpeg'))
+                                    if is_img: st.image(item['content'], use_container_width=True)
+                                    else: st.info(f"Ficheiro pronto para o relatório.")
+                                    if st.button("🗑️ Remover", key=f"del_{marcador}_{idx}"): 
+                                        st.session_state.dados_sessao[marcador].pop(idx); st.rerun()
 
-                                    # info para pdf
-                                    else:
-                                        ext = item['name'].split('.')[-1].upper()
-                                        st.info(f"Ficheiro {ext} pronto para o relatório.")
-                                    # botão remover
-                                    if st.button("🗑️ Remover", key=f"del_{marcador}_{idx}"):
-                                        st.session_state.dados_sessao[marcador].pop(idx)
-                                        st.rerun()
 # --- GERAÇÃO FINAL ---
 if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_finalizar"):
     try:
@@ -533,10 +507,50 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
                 doc = DocxTemplate("template-cachoeira.docx")
                 # Lógica de somas para Cachoeira
                 h_total_saida = sum([st.session_state.get(k, 0) for k in ["H_ALTA", "H_TRANSF_MAIOR", "H_TRANSF_MENOR", "H_EVASAO", "H_OBITO_MAIOR", "H_OBITO_MENOR"]])
+                h_total_transf_int = st.session_state.get("H_TRANSF_MAIOR", 0) + st.session_state.get("H_TRANSF_INT", 0)
+                h_t_obito = st.session_state.get("H_OBITO_MAIOR", 0) + st.session_state.get("H_OBITO_MENOR", 0)
+                h_total_ob_int = st.session_state.get("H_OB_INT", 0) + st.session_state.get("H_OBITO_MAIOR", 0)
                 h_t_atend_emerg = sum([st.session_state.get(k, 0) for k in ["H_GINECO", "H_CIR_GERAL", "H_MED_CLI", "H_ORTO", "H_PED"]])
-                total_amb_parecer = sum([st.session_state.get(k, 0) for k in FORM_KEYS if "PARECER_" in k])
+                
+                parecer_keys = [k for k in FORM_KEYS if "PARECER_" in k]
+                total_amb_parecer = sum([st.session_state.get(k, 0) for k in parecer_keys])
+                h_t_atend_amb = sum([st.session_state.get(k, 0) for k in ["AMB_FISIO", "AMB_PSICO", "AMB_FONO", "AMB_SERV_SOC"]]) + total_amb_parecer
+                
+                h_t_cir_elet = sum([st.session_state.get(k, 0) for k in ["H_ELE_CIR_GER", "H_ELE_CIR_ORTO", "H_ELE_CIR_BUCO", "H_ELE_CIR_URO"]])
+                h_t_cir_emerg = sum([st.session_state.get(k, 0) for k in ["H_EMERG_CIR_GER", "H_EMERG_PART_CES", "H_EMERG_VASC", "H_EMERG_URO", "H_EMERG_ORT", "H_EMERG_GINECO"]])
+                h_t_exa_proc = st.session_state.get("H_EX_ENDO", 0) + st.session_state.get("H_EX_COLO", 0)
+                h_t_plan_fami = sum([st.session_state.get(k, 0) for k in ["H_PF_LAQ", "H_PF_DIU", "H_PF_BIO"]])
+                
+                # Fórmula conforme imagem de referência: Eletiva + Emergência + Exames + Planejamento Familiar
+                h_t_proc_cir = h_t_cir_elet + h_t_cir_emerg + h_t_exa_proc + h_t_plan_fami
+                
+                upa_t_atend_emerg = st.session_state.get("UPA_MED_CLI", 0) + st.session_state.get("UPA_MED_PED", 0)
+                upa_t_exa_proc = sum([st.session_state.get(k, 0) for k in ["UPA_EX_ELETRO", "UPA_EX_LAB", "UPA_EX_RADIO"]])
+                
                 contexto = {k: st.session_state.get(k, 0) for k in FORM_KEYS}
-                contexto.update({"SISTEMA_MES_REFERENCIA": f"{st.session_state.sel_mes}/{st.session_state.sel_ano}", "H_TOTAL_SAIDA": h_total_saida, "H_T_ATEND_EMERG": h_t_atend_emerg, "TOTAL_AMB_PARECER": total_amb_parecer})
+                contexto.update({
+                    "SISTEMA_MES_REFERENCIA": f"{st.session_state.sel_mes}/{st.session_state.sel_ano}",
+                    "H_TOTAL_SAIDA": h_total_saida,
+                    "H_TOTAL_TRANSF_INT": h_total_transf_int,
+                    "H_T_OBITO": h_t_obito,
+                    "H_TOTAL_OB_INT": h_total_ob_int,
+                    "H_T_ATEND_EMERG": h_t_atend_emerg,
+                    "TOTAL_AMB_PARECER": total_amb_parecer,
+                    "AMB_PARECER": total_amb_parecer,
+                    "H_T_ATEND_AMB": h_t_atend_amb,
+                    "H_T_PROC_CIR": h_t_proc_cir,
+                    "H_T_CIR_ELET": h_t_cir_elet,
+                    "H_T_CIR_EMERG": h_t_cir_emerg,
+                    "H_CIR_EMERG": h_t_cir_emerg,
+                    "H_T_EXA_PROC": h_t_exa_proc,
+                    "H_EXA_PROC": h_t_exa_proc,
+                    "H_T_PLAN_FAMI": h_t_plan_fami,
+                    "H_PLAN_FAMI": h_t_plan_fami,
+                    "UPA_T_ATEND_EMERG": upa_t_atend_emerg,
+                    "UPA_T_EXA_PROC": upa_t_exa_proc,
+                    "UPA_T_PESQ": st.session_state.get("UPA_PESQ_INT", 0) + st.session_state.get("UPA_PESQ_RECEP", 0),
+                    "H_TOTAL_SAU_PESQ": st.session_state.get("H_SAU_PESQ_INT", 0) + st.session_state.get("H_SAU_OUV_RECEP", 0)
+                })
                 for m in DIMENSOES_CAMPOS.keys():
                     imgs = []
                     for item in st.session_state.dados_sessao.get(m, []):
@@ -554,7 +568,3 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
     except Exception as e: st.error(f"Erro: {e}")
 
 st.caption("Desenvolvido por Leonardo Barcelos Martins")
-
-
-
-
