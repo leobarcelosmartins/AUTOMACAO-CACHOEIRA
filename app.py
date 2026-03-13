@@ -17,7 +17,7 @@ import zipfile
 from pathlib import Path
 
 # --- CONFIGURAÇÕES DE LAYOUT ---
-st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="wide")
+st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="centered")
 
 # --- CUSTOM CSS ---
 st.markdown("""
