@@ -17,14 +17,13 @@ import zipfile
 from pathlib import Path
 
 # --- CONFIGURAÇÕES DE LAYOUT ---
-st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="centered")
+st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="wide")
 
 # --- CUSTOM CSS ---
 st.markdown("""
     <style>
     .main { background-color: #f0f2f5; }
     
-    /* CONFIGURAÇÃO DO GHOST CARD VIA CONTAINER NATIVO */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #ffffff !important;
         border: 1px solid #d1d5db !important;
@@ -33,7 +32,6 @@ st.markdown("""
         margin-bottom: 20px !important;
     }
     
-    /* BOTÃO PRIMÁRIO VERDE (CONFORME IMAGEM DO GESTOR) */
     div.stButton > button[kind="primary"] {
         background-color: #28a745 !important;
         color: white !important;
@@ -44,7 +42,6 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* BOTÃO SECUNDÁRIO PADRÃO (BORDA CINZA) */
     div.stButton > button[kind="secondary"] {
         background-color: #ffffff !important;
         border: 1px solid #d1d5db !important;
@@ -64,7 +61,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- DICIONÁRIO DE DIMENSÕES (CONTRATO CACHOEIRA) ---
+# --- DICIONÁRIO DE DIMENSÕES ---
 DIMENSOES_CAMPOS = {
     "PRINT_ATEND_OCUPACAO": 165, "PRINT_CLASSIFICAÇÃO": 165,
     "GRAFICO_CIRURGIAS_ELETIVAS": 125, "TABELA_CIRURGIAS": 190,
@@ -85,7 +82,7 @@ DIMENSOES_CAMPOS = {
     "TABELA_QUANTI": 200, "TABELA_QUALI": 200
 }
 
-# --- DICIONÁRIO DE DESCRIÇÕES AMIGÁVEIS (LABELS) ---
+# --- LABELS AMIGÁVEIS ---
 LABELS_EVIDENCIAS = {
     "PRINT_ATEND_OCUPACAO": "Tabela de Atendimento por Ocupação",
     "PRINT_CLASSIFICAÇÃO": "Tabela de Classificação de Risco",
@@ -123,7 +120,7 @@ LABELS_EVIDENCIAS = {
     "TABELA_QUALI": "Tabela Quali (Geral)"
 }
 
-# --- CHAVES DE CAMPOS ---
+# --- CHAVES DE CAMPOS (APENAS MANUAIS) ---
 FORM_KEYS = [
     "sel_mes", "sel_ano", "H_T_PAC_INT", "H_ALTA", "H_TRANSF_MAIOR", "H_TRANSF_MENOR",
     "H_TRANSF_INT", "H_EVASAO", "H_OBITO_MAIOR", "H_OBITO_MENOR", "H_OB_INT",
@@ -207,7 +204,6 @@ def excluir_relatorio(nome):
         st.success(f"Relatório '{nome}' excluído.")
         st.rerun()
 
-# --- FUNÇÕES DE BACKUP (ZIP) ---
 def gerar_backup_zip():
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -291,7 +287,7 @@ def processar_item_lista(doc_template, item, marcador):
 # --- UI PRINCIPAL ---
 st.title("Automação de Relatórios - Cachoeira")
 
-# --- GESTOR DE RELATÓRIOS (ESTILO DA IMAGEM) ---
+# --- GESTOR DE RELATÓRIOS (HORIZONTAL) ---
 with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session_state.relatorio_atual):
     col_g1, col_g2 = st.columns([2, 1])
     with col_g1:
@@ -308,7 +304,7 @@ with st.expander("📂 Gestor de Relatórios Guardados", expanded=not st.session
         if st.button("💾 Salvar Progresso", use_container_width=True, type="primary"):
             salvar_relatorio(novo_nome)
 
-# --- BACKUP EXTERNO (ZIP) - MESMO ESTILO ---
+# --- BACKUP ZIP ---
 with st.expander("☁️ Backup Externo (Importar / Exportar ZIP)", expanded=False):
     col_z1, col_z2 = st.columns([2, 1])
     with col_z1:
@@ -341,7 +337,6 @@ with t_hosp:
         with c1: st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], key="sel_mes")
         with c2: st.selectbox("Ano", [2026, 2027, 2028], index=0, key="sel_ano")
         with c3: st.number_input("Total Pacientes Internados", key="H_T_PAC_INT", step=1)
-        # Campo manual adicionado conforme PDF
         with st.columns(3)[0]: st.number_input("Total de Transferências", key="H_TOTAL_TRANSF", step=1)
     
     with st.container(border=True):
@@ -414,6 +409,10 @@ with t_cir:
         with c1: st.number_input("Emerg. Cirurgia Geral", key="H_EMERG_CIR_GER", step=1)
         with c2: st.number_input("Emerg. Parto Cesárea", key="H_EMERG_PART_CES", step=1)
         with c3: st.number_input("Emerg. Vascular", key="H_EMERG_VASC", step=1)
+        c1, c2, c3 = st.columns(3)
+        with c1: st.number_input("Emerg. Urologia", key="H_EMERG_URO", step=1)
+        with c2: st.number_input("Emerg. Ortopedia", key="H_EMERG_ORT", step=1)
+        with c3: st.number_input("Emerg. Ginecologia", key="H_EMERG_GINECO", step=1)
     with st.container(border=True):
         st.markdown("### Planejamento Familiar e Exames")
         c1, c2, c3 = st.columns(3)
@@ -455,9 +454,9 @@ with t_upa:
         with c1: st.number_input("Pesquisa Interna UPA", key="UPA_PESQ_INT", step=1)
         with c2: st.number_input("Pesquisa Receptiva UPA", key="UPA_PESQ_RECEP", step=1)
 
-# --- ABA ARQUIVOS (EVIDÊNCIAS) ---
+# --- ABA ARQUIVOS ---
 with t_evidencia:
-    secoes_evidencias = [
+    secoes = [
         {"nome": "Hospital - Atendimentos e Classificação", "marcadores": ["PRINT_ATEND_OCUPACAO", "PRINT_CLASSIFICAÇÃO"]},
         {"nome": "Hospital - Cirurgias e Procedimentos", "marcadores": ["GRAFICO_CIRURGIAS_ELETIVAS", "TABELA_CIRURGIAS", "TABELA_RAIOX"]},
         {"nome": "Hospital - Transferências e Óbitos", "marcadores": ["TABELA_CONS_TRANSFERENCIA", "TABELA_DET_TRANSFERENCIA", "TABELA_OBITO", "ATA_OBITO"]},
@@ -468,24 +467,21 @@ with t_evidencia:
         {"nome": "UPA - Pesquisa de Satisfação", "marcadores": ["UPA_TABELA_PESQUISA_INTERNA", "UPA_GRAFICO_PESQUISA_INTERNA", "UPA_TABELA_PESQUISA_RECEPTIVA", "UPA_GRAFICO_PESQUISA_RECEPTIVA", "UPA_GRAFICO_PESQUISA_RECEPTIVA_2"]},
         {"nome": "Indicadores Gerais", "marcadores": ["TABELA_QUANTI", "TABELA_QUALI"]}
     ]
-
-    for secao in secoes_evidencias:
+    for secao in secoes:
         with st.expander(f"📌 {secao['nome']}", expanded=False):
             for marcador in secao['marcadores']:
                 if marcador in DIMENSOES_CAMPOS:
                     with st.container(border=True):
-                        label_exibicao = LABELS_EVIDENCIAS.get(marcador, marcador)
-                        st.markdown(f"<span class='upload-label'>{label_exibicao} (Largura: {DIMENSOES_CAMPOS[marcador]}mm)</span>", unsafe_allow_html=True)
+                        label = LABELS_EVIDENCIAS.get(marcador, marcador)
+                        st.markdown(f"<span class='upload-label'>{label} ({DIMENSOES_CAMPOS[marcador]}mm)</span>", unsafe_allow_html=True)
                         f_up = st.file_uploader("Upload", type=['png', 'jpg', 'pdf'], key=f"f_{marcador}", label_visibility="collapsed")
                         if f_up and f_up.name not in [x['name'] for x in st.session_state.dados_sessao.get(marcador, [])]:
                             st.session_state.dados_sessao[marcador].append({"name": f_up.name, "content": f_up, "type": "f"})
                         kp = f"p_{marcador}_{len(st.session_state.dados_sessao.get(marcador, []))}"
                         pasted = paste_image_button(label="📸 Colar Print", key=kp)
                         if pasted is not None and pasted.image_data is not None:
-                            st.session_state.dados_sessao[marcador].append({
-                                "name": f"Captura_{marcador}_{int(time.time())}.png", "content": pasted.image_data, "type": "p"
-                            })
-                            st.toast(f"Anexado: {label_exibicao}"); time.sleep(0.4); st.rerun()
+                            st.session_state.dados_sessao[marcador].append({"name": f"Captura_{marcador}_{int(time.time())}.png", "content": pasted.image_data, "type": "p"})
+                            st.toast(f"Anexado: {label}"); time.sleep(0.4); st.rerun()
                         if st.session_state.dados_sessao.get(marcador):
                             for idx, item in enumerate(st.session_state.dados_sessao[marcador]):
                                 with st.expander(f"📄 {item['name']}", expanded=False):
@@ -501,26 +497,50 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
         with st.spinner("Gerando documento..."):
             with tempfile.TemporaryDirectory() as tmp:
                 doc = DocxTemplate("template-cachoeira.docx")
-                # Lógica de somas para Cachoeira
-                h_total_saida = sum([st.session_state.get(k, 0) for k in ["H_ALTA", "H_TRANSF_MAIOR", "H_TRANSF_MENOR", "H_EVASAO", "H_OBITO_MAIOR", "H_OBITO_MENOR"]])
-                h_total_transf_int = st.session_state.get("H_TRANSF_MAIOR", 0) + st.session_state.get("H_TRANSF_INT", 0)
-                h_t_obito = st.session_state.get("H_OBITO_MAIOR", 0) + st.session_state.get("H_OBITO_MENOR", 0)
-                h_total_ob_int = st.session_state.get("H_OB_INT", 0) + st.session_state.get("H_OBITO_MAIOR", 0)
+                # REGRAS DE SOMA (PDF PÁGINA 11-15)
+                h_alta = st.session_state.get("H_ALTA", 0)
+                h_transf_maior = st.session_state.get("H_TRANSF_MAIOR", 0)
+                h_transf_menor = st.session_state.get("H_TRANSF_MENOR", 0)
+                h_evasao = st.session_state.get("H_EVASAO", 0)
+                h_obito_maior = st.session_state.get("H_OBITO_MAIOR", 0)
+                h_obito_menor = st.session_state.get("H_OBITO_MENOR", 0)
+                h_transf_int = st.session_state.get("H_TRANSF_INT", 0)
+                h_ob_int = st.session_state.get("H_OB_INT", 0)
+
+                h_total_saida = sum([h_alta, h_transf_maior, h_transf_menor, h_evasao, h_obito_maior, h_obito_menor])
+                h_total_transf_int = h_transf_maior + h_transf_int
+                h_t_obito = h_obito_maior + h_obito_menor
+                h_total_ob_int = h_ob_int + h_obito_maior
                 h_t_atend_emerg = sum([st.session_state.get(k, 0) for k in ["H_GINECO", "H_CIR_GERAL", "H_MED_CLI", "H_ORTO", "H_PED"]])
                 
                 parecer_keys = [k for k in FORM_KEYS if "PARECER_" in k]
                 total_amb_parecer = sum([st.session_state.get(k, 0) for k in parecer_keys])
                 h_t_atend_amb = sum([st.session_state.get(k, 0) for k in ["AMB_FISIO", "AMB_PSICO", "AMB_FONO", "AMB_SERV_SOC"]]) + total_amb_parecer
                 
-                h_t_cir_elet = sum([st.session_state.get(k, 0) for k in ["H_ELE_CIR_GER", "H_ELE_CIR_ORTO", "H_ELE_CIR_BUCO", "H_ELE_CIR_URO"]])
-                h_t_cir_emerg = sum([st.session_state.get(k, 0) for k in ["H_EMERG_CIR_GER", "H_EMERG_PART_CES", "H_EMERG_VASC", "H_EMERG_URO", "H_EMERG_ORT", "H_EMERG_GINECO"]])
-                h_t_exa_proc = st.session_state.get("H_EX_ENDO", 0) + st.session_state.get("H_EX_COLO", 0)
-                h_t_plan_fami = sum([st.session_state.get(k, 0) for k in ["H_PF_LAQ", "H_PF_DIU", "H_PF_BIO"]])
+                h_ele_cir_ger = st.session_state.get("H_ELE_CIR_GER", 0)
+                h_ele_cir_ort = st.session_state.get("H_ELE_CIR_ORTO", 0)
+                h_ele_cir_buc = st.session_state.get("H_ELE_CIR_BUCO", 0)
+                h_ele_cir_uro = st.session_state.get("H_ELE_CIR_URO", 0)
+                h_t_cir_elet = sum([h_ele_cir_ger, h_ele_cir_ort, h_ele_cir_buc, h_ele_cir_uro])
+
+                h_emerg_cir_ger = st.session_state.get("H_EMERG_CIR_GER", 0)
+                h_emerg_part = st.session_state.get("H_EMERG_PART_CES", 0)
+                h_emerg_vasc = st.session_state.get("H_EMERG_VASC", 0)
+                h_emerg_uro = st.session_state.get("H_EMERG_URO", 0)
+                h_emerg_ort = st.session_state.get("H_EMERG_ORT", 0)
+                h_emerg_gin = st.session_state.get("H_EMERG_GINECO", 0)
+                h_t_cir_emerg = sum([h_emerg_cir_ger, h_emerg_part, h_emerg_vasc, h_emerg_uro, h_emerg_ort, h_emerg_gin])
+
+                h_exa_endo = st.session_state.get("H_EX_ENDO", 0)
+                h_exa_colo = st.session_state.get("H_EX_COLO", 0)
+                h_t_exa_proc = h_exa_endo + h_exa_colo
                 
-                # Cálculo de exames ambulatoriais (Page 14 PDF)
+                h_pf_laq = st.session_state.get("H_PF_LAQ", 0)
+                h_pf_diu = st.session_state.get("H_PF_DIU", 0)
+                h_pf_bio = st.session_state.get("H_PF_BIO", 0)
+                h_t_plan_fami = sum([h_pf_laq, h_pf_diu, h_pf_bio])
+                
                 amb_t_exam = sum([st.session_state.get(k, 0) for k in ["AMB_EX_HEMOD", "AMB_EX_LABOR", "AMB_EX_RADIO"]])
-                
-                # Fórmula conforme imagem de referência: Eletiva + Emergência + Exames + Planejamento Familiar
                 h_t_proc_cir = h_t_cir_elet + h_t_cir_emerg + h_t_exa_proc + h_t_plan_fami
                 
                 upa_t_atend_emerg = st.session_state.get("UPA_MED_CLI", 0) + st.session_state.get("UPA_MED_PED", 0)
@@ -546,10 +566,7 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
                     "H_T_PLAN_FAMI": h_t_plan_fami,
                     "H_PLAN_FAMI": h_t_plan_fami,
                     "AMB_T_EXAM": amb_t_exam,
-                    "H_CIR_GER": st.session_state.get("H_ELE_CIR_GER", 0),
-                    "H_CIR_ORTO": st.session_state.get("H_ELE_CIR_ORTO", 0),
-                    "H_CIR_BUCO": st.session_state.get("H_ELE_CIR_BUCO", 0),
-                    "H_CIR_URO": st.session_state.get("H_ELE_CIR_URO", 0),
+                    "H_CIR_GER": h_ele_cir_ger, "H_CIR_ORTO": h_ele_cir_ort, "H_CIR_BUCO": h_ele_cir_buc, "H_CIR_URO": h_ele_cir_uro,
                     "UPA_T_ATEND_EMERG": upa_t_atend_emerg,
                     "UPA_T_EXA_PROC": upa_t_exa_proc,
                     "UPA_T_PESQ": st.session_state.get("UPA_PESQ_INT", 0) + st.session_state.get("UPA_PESQ_RECEP", 0),
