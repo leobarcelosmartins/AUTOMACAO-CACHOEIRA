@@ -17,7 +17,6 @@ import zipfile
 from pathlib import Path
 
 # --- CONFIGURAÇÕES DE LAYOUT ---
-# Alterado para wide para suportar o layout horizontal do Gestor
 st.set_page_config(page_title="Gerador de Relatórios Madalena", layout="centered")
 
 # --- CUSTOM CSS ---
@@ -45,7 +44,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* BOTÃO SECUNDÁRIO PADRÃO (CARREGAR / EXCLUIR) */
+    /* BOTÃO SECUNDÁRIO PADRÃO (BORDA CINZA) */
     div.stButton > button[kind="secondary"] {
         background-color: #ffffff !important;
         border: 1px solid #d1d5db !important;
@@ -138,7 +137,7 @@ FORM_KEYS = [
     "H_PF_LAQ", "H_PF_DIU", "H_PF_BIO", "H_EX_ENDO", "H_EX_COLO",
     "AMB_EX_HEMOD", "AMB_EX_LABOR", "AMB_EX_RADIO", "H_RP_TOTAL_PAC", "H_SAU_PESQ_INT", "H_SAU_OUV_RECEP",
     "UPA_MED_CLI", "UPA_MED_PED", "UPA_ATEND_AS", "UPA_ATEND_NUTRI", "UPA_EX_ELETRO", "UPA_EX_LAB", "UPA_EX_RADIO",
-    "UPA_PESQ_INT", "UPA_PESQ_RECEP", "UPA_T_TRANSF"
+    "UPA_PESQ_INT", "UPA_PESQ_RECEP", "UPA_T_TRANSF", "H_TOTAL_TRANSF"
 ]
 
 # --- ESTADO DA SESSÃO ---
@@ -342,6 +341,8 @@ with t_hosp:
         with c1: st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], key="sel_mes")
         with c2: st.selectbox("Ano", [2026, 2027, 2028], index=0, key="sel_ano")
         with c3: st.number_input("Total Pacientes Internados", key="H_T_PAC_INT", step=1)
+        # Campo manual adicionado conforme PDF
+        with st.columns(3)[0]: st.number_input("Total de Transferências", key="H_TOTAL_TRANSF", step=1)
     
     with st.container(border=True):
         st.markdown("### Saídas e Óbitos")
@@ -424,7 +425,7 @@ with t_cir:
         with c2: st.number_input("Colonoscopia", key="H_EX_COLO", step=1)
         with c3: st.number_input("Hemodiálise", key="AMB_EX_HEMOD", step=1)
         with c4: st.number_input("Laboratório", key="AMB_EX_LABOR", step=1)
-        with c5: st.number_input("Radiografia", key="AMB_EX_RADIO", step=1)
+        with st.columns(5)[0]: st.number_input("Radiografia", key="AMB_EX_RADIO", step=1)
     with st.container(border=True):
         st.markdown("### Pesquisa SAU e Revisão")
         c1, c2, c3 = st.columns(3)
@@ -456,7 +457,6 @@ with t_upa:
 
 # --- ABA ARQUIVOS (EVIDÊNCIAS) ---
 with t_evidencia:
-    # Agrupamento conforme solicitado anteriormente para melhor navegação
     secoes_evidencias = [
         {"nome": "Hospital - Atendimentos e Classificação", "marcadores": ["PRINT_ATEND_OCUPACAO", "PRINT_CLASSIFICAÇÃO"]},
         {"nome": "Hospital - Cirurgias e Procedimentos", "marcadores": ["GRAFICO_CIRURGIAS_ELETIVAS", "TABELA_CIRURGIAS", "TABELA_RAIOX"]},
@@ -474,14 +474,11 @@ with t_evidencia:
             for marcador in secao['marcadores']:
                 if marcador in DIMENSOES_CAMPOS:
                     with st.container(border=True):
-                        # Implementação da melhoria das Labels
                         label_exibicao = LABELS_EVIDENCIAS.get(marcador, marcador)
                         st.markdown(f"<span class='upload-label'>{label_exibicao} (Largura: {DIMENSOES_CAMPOS[marcador]}mm)</span>", unsafe_allow_html=True)
-                        
                         f_up = st.file_uploader("Upload", type=['png', 'jpg', 'pdf'], key=f"f_{marcador}", label_visibility="collapsed")
                         if f_up and f_up.name not in [x['name'] for x in st.session_state.dados_sessao.get(marcador, [])]:
                             st.session_state.dados_sessao[marcador].append({"name": f_up.name, "content": f_up, "type": "f"})
-                        
                         kp = f"p_{marcador}_{len(st.session_state.dados_sessao.get(marcador, []))}"
                         pasted = paste_image_button(label="📸 Colar Print", key=kp)
                         if pasted is not None and pasted.image_data is not None:
@@ -489,7 +486,6 @@ with t_evidencia:
                                 "name": f"Captura_{marcador}_{int(time.time())}.png", "content": pasted.image_data, "type": "p"
                             })
                             st.toast(f"Anexado: {label_exibicao}"); time.sleep(0.4); st.rerun()
-                        
                         if st.session_state.dados_sessao.get(marcador):
                             for idx, item in enumerate(st.session_state.dados_sessao[marcador]):
                                 with st.expander(f"📄 {item['name']}", expanded=False):
@@ -521,6 +517,9 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
                 h_t_exa_proc = st.session_state.get("H_EX_ENDO", 0) + st.session_state.get("H_EX_COLO", 0)
                 h_t_plan_fami = sum([st.session_state.get(k, 0) for k in ["H_PF_LAQ", "H_PF_DIU", "H_PF_BIO"]])
                 
+                # Cálculo de exames ambulatoriais (Page 14 PDF)
+                amb_t_exam = sum([st.session_state.get(k, 0) for k in ["AMB_EX_HEMOD", "AMB_EX_LABOR", "AMB_EX_RADIO"]])
+                
                 # Fórmula conforme imagem de referência: Eletiva + Emergência + Exames + Planejamento Familiar
                 h_t_proc_cir = h_t_cir_elet + h_t_cir_emerg + h_t_exa_proc + h_t_plan_fami
                 
@@ -546,6 +545,11 @@ if st.button("FINALIZAR E GERAR RELATÓRIO CACHOEIRA", type="primary", key="btn_
                     "H_EXA_PROC": h_t_exa_proc,
                     "H_T_PLAN_FAMI": h_t_plan_fami,
                     "H_PLAN_FAMI": h_t_plan_fami,
+                    "AMB_T_EXAM": amb_t_exam,
+                    "H_CIR_GER": st.session_state.get("H_ELE_CIR_GER", 0),
+                    "H_CIR_ORTO": st.session_state.get("H_ELE_CIR_ORTO", 0),
+                    "H_CIR_BUCO": st.session_state.get("H_ELE_CIR_BUCO", 0),
+                    "H_CIR_URO": st.session_state.get("H_ELE_CIR_URO", 0),
                     "UPA_T_ATEND_EMERG": upa_t_atend_emerg,
                     "UPA_T_EXA_PROC": upa_t_exa_proc,
                     "UPA_T_PESQ": st.session_state.get("UPA_PESQ_INT", 0) + st.session_state.get("UPA_PESQ_RECEP", 0),
